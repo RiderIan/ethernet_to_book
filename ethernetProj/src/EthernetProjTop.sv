@@ -27,6 +27,7 @@ module EthernetProjTop(
 
     // Signals
     logic clkLcl;
+    logic rstLcl
     logic rstLcl;
     logic clk125;
     logic clk125Rx;
@@ -41,7 +42,7 @@ module EthernetProjTop(
         .O(clkLcl));
 
     // Synchronize de-assertion of reset
-    always @(posedge clkLcl or posedge rstIn) begin
+    always @(posedge clkLcl or posedge rstIn) begin : reset_deassert_sync_inst
         if (rstIn)
             rstLcl <= 1'b1;
         else
