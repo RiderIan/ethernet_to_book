@@ -1,17 +1,20 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Dev: Ian Rider
-// Purpose: Verify data to clock skew of RMGII TX and RX is 1.6ns-2.0ns 
+// Purpose: Verify data to clock skew of RMGII TX and RX is 1.0ns-2.6ns 
 //////////////////////////////////////////////////////////////////////////////////
 
 module clockCheck;
+
+    const int CLK_100_MHX_PERIOD = 10;
+    const int CLK_125_MHZ_PERIOD = 8;
 
     logic       clk100       = 0;
     logic       rst          = 1;
 
     logic [3:0] rxData;
     logic       rxCtrl;
-    logic       rxClk;
+    logic       rxClk        = 0;
 
     logic [3:0] txData;
     logic       txCtrl;
@@ -20,14 +23,18 @@ module clockCheck;
     logic       intB;
     logic       phyRstB;
 
-    logic       mmcm0Locked;
-    logic       clk125;
+    logic       mmcm0Locked = 0;
+    logic       mmcm1Locked = 0;
+    logic       txClkFabric;
 
-    real        macSysClk125Time;
-    real        macDlyClk125Time;
+    real        txClkFabricTime;
+    real        txClkPhyTime;
+    real        rxClkFabricTime;
+    real        rxClkPhyTime;
 
     // Clock gen
-    always #5 clk100 = ~clk100;
+    always #(CLK_100_MHX_PERIOD/2) clk100 = ~clk100;
+    always #(CLK_125_MHZ_PERIOD/2) rxClk  = ~rxClk;
 
     // DUT
     EthernetProjTop dut (
@@ -45,22 +52,31 @@ module clockCheck;
         .intBIn(intB),
         .phyRstBOut(phyRstB),
         
-        .mcmm0LockedOut(mmcm0Locked),
-        .clk125Out(clk125));
+        .mmcm0LockedOut(mmcm0Locked),
+        .mmcm1LockedOut(mmcm1Locked),
+        .txClkFabricOut(txClkFabric),
+        .rxClkFabricOut(rxClkFabric));
 
     initial begin
         rst = 1;
         #20;
         rst = 0;
-        $display("Waiting for mmcm lock");
-        wait (mmcm0Locked == 1);
-        @(posedge clk125);
-        macSysClk125Time = $realtime;
+        $display("Waiting for both mmcms lock - ", $realtime, "ns");
+        wait(mmcm0Locked == 1'b1 && mmcm1Locked == 1'b1);
+        @(posedge txClkFabric);
+        txClkFabricTime = $realtime;
         @(posedge txClk);
-        macDlyClk125Time = $realtime;
+        txClkPhyTime = $realtime;
+        @(posedge rxClk);
+        rxClkPhyTime = $realtime;
+        @(posedge rxClkFabric);
+        rxClkFabricTime = $realtime;
 
-        assert((macSysClk125Time + 1.5) == macDlyClk125Time) else $fatal("Clock skew of 1.5ns not achieved. Measured skew = ", (macDlyClk125Time - macSysClk125Time));
-        $display("Measured clock skew: ", macDlyClk125Time - macSysClk125Time, "ns");
+
+        assert((txClkFabricTime + 1.5) == txClkPhyTime) else $fatal("TX clock skew of 1.5ns not achieved. Measured skew = ", (txClkPhyTime    - txClkFabricTime));
+        assert((rxClkPhyTime + 1.5) == rxClkFabricTime) else $fatal("RX clock skew of 1.5ns not achieved. Measured skew = ", (rxClkFabricTime - rxClkPhyTime));
+        $display("Measured clock skew: ", txClkPhyTime    - txClkFabricTime, "ns");
+        $display("Measured clock skew: ", rxClkFabricTime - rxClkPhyTime,    "ns");
         $display("This test ran");
         $finish;
     end
