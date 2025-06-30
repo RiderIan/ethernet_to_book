@@ -4,12 +4,9 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 `include "RGMII.sv"
+`include "CLKS_RSTS.sv"
 
 module EthernetProjTop (
-    output logic       mmcm0LockedOut, // simulation only
-    output logic       mmcm1LockedOut, // simulation only
-    output logic       txClkFabricOut, // simulation only
-    output logic       rxClkFabricOut, // simulation only
 
     input    logic     clkIn,
     input    logic     rstIn,
@@ -30,7 +27,7 @@ module EthernetProjTop (
     // Signals
     logic clkLcl;
     logic rstLcl;
-    logic clk125;
+    logic clk125Tx;
     logic clk125Rx;
     logic clk250;
     logic mmcm0Locked; 
@@ -39,38 +36,25 @@ module EthernetProjTop (
     /////////////////////////////////
     // Clocks and Resets
     /////////////////////////////////
-    BUFG BUFG_inst (
-        .I(clkIn),
-        .O(clkLcl));
-
-    // Synchronize de-assertion of reset
-    always @(posedge clkLcl or posedge rstIn) begin : reset_deassert_sync_inst
-        if (rstIn)
-            rstLcl <= 1'b1;
-        else
-            rstLcl <= 1'b0;
-    end
-
-    system_clocks_gen mmcm0_inst (
-        .clk_out1(clk125),            // Local 125Mhz for RGMII
-        .clk_out2(txClkOut),          // 125Mhz clock delayed by 1.5ns for PHY tx clock
-        .clk_out3(clk250),            // 250Mhz system clock for parsers/book builder
-        .reset(rstLcl),               // reset
-        .locked(mmcm0Locked),         // Indicated ouput clocks are locked/valid
-        .clk_in1(clkIn));             // 100Mhz reference clock
-
-    rx_clk_shift mmcm1_inst (
-        .clk_out1(clk125Rx),          // 125Mhz clock delayed for mgii rx logic
-        .reset(rstLcl),               // reset
-        .locked(mmcm1Locked),         // Indicated ouput clock is locked/valid
-        .clk_in1(rxClkIn));           // 125 MHz reference clock provided by PHY
+    CLKS_RSTS clks_rsts_inst (
+        .rstIn(rstIn),
+        .clkIn(clkIn),
+        .rxClkIn(rxClkIn),
+        .rstLclOut(rstLcl),
+        .clkLclOut(clkLcl),
+        .clk125TxOut(clk125Tx),
+        .txClkOut(txClkOut),
+        .clk250Out(clk250),
+        .clk125RxOut(clk125Rx),
+        .mmcm0LockedOut(mmcm0Locked),
+        .mmcm1LockedOut(mmcm1Locked));
 
     /////////////////////////////////
     // RGMII
     /////////////////////////////////
     RGMII mac_inst (
         .rstIn(rstLcl),
-        .clk125In(clk125),
+        .clk125In(clk125Tx),
         .rxClkIn(clk125Rx),
         .rxCtrlIn(rxCtrlIn),
         .intBIn(intBIn),
@@ -80,11 +64,5 @@ module EthernetProjTop (
         .txDataOut(txDataOut),
         .txCtrlOut(txCtrlOut),
         .phyRstBOut(phyRstBOut));
-
-    // Ports for sim only
-    assign mmcm0LockedOut = mmcm0Locked;
-    assign mmcm1LockedOut = mmcm1Locked;
-    assign txClkFabricOut = clk125;
-    assign rxClkFabricOut = clk125Rx;
 
 endmodule

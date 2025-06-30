@@ -15,5 +15,5 @@ create_clock -period 8  -name rx_clk_125   [get_ports rxClkIn]
 # create_generated_clock -name rx_clk_125_dly -source rx_clk_125                                 -add 1.5 [get_pins mmcm1_inst/inst/mmcm_adv_inst/CLKOUT0]
 
 # Asynchronous reset
-set_false_path -from [get_ports rstIn] -to [all_registers]
-set_max_delay 10 -from [get_ports clkIn] -to [get_pins reset_deassert_sync_inst/rstLcl]
+set_false_path   -from [get_ports rstIn] -to [all_registers]
+set_max_delay 10 -from [get_ports clkIn] -to [get_pins clks_rsts_inst/reset_deassert_sync_inst/rstLcl]

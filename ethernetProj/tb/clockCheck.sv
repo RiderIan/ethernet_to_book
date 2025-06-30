@@ -3,6 +3,7 @@
 // Dev: Ian Rider
 // Purpose: Verify data to clock skew of RMGII TX and RX is 1.0ns-2.6ns 
 //////////////////////////////////////////////////////////////////////////////////
+`include "tasks.sv"
 
 module clockCheck;
 
@@ -11,6 +12,9 @@ module clockCheck;
 
     logic       clk100       = 0;
     logic       rst          = 1;
+    logic       rstLcl;
+    logic       clkLcl;
+    logic       clk250;
 
     logic [3:0] rxData;
     logic       rxCtrl;
@@ -37,32 +41,23 @@ module clockCheck;
     always #(CLK_125_MHZ_PERIOD/2) rxClk  = ~rxClk;
 
     // DUT
-    EthernetProjTop dut (
-        .clkIn(clk100),
+    CLKS_RSTS dut (
         .rstIn(rst),
-
-        .rxDataIn(rxData),
-        .rxCtrlIn(rxCtrl),
+        .clkIn(clk100),
         .rxClkIn(rxClk),
-
-        .txDataOut(txData),
-        .txCtrlOut(txCtrl),
+        .rstLclOut(rstLcl),
+        .clkLclOut(clkLcl),
+        .clk125TxOut(txClkFabric),
         .txClkOut(txClk),
-
-        .intBIn(intB),
-        .phyRstBOut(phyRstB),
-        
+        .clk250Out(clk250),
+        .clk125RxOut(rxClkFabric),
         .mmcm0LockedOut(mmcm0Locked),
-        .mmcm1LockedOut(mmcm1Locked),
-        .txClkFabricOut(txClkFabric),
-        .rxClkFabricOut(rxClkFabric));
+        .mmcm1LockedOut(mmcm1Locked));
 
     initial begin
-        rst = 1;
-        #20;
-        rst = 0;
+        init_reset(rst);
         $display("Waiting for both mmcms lock - ", $realtime, "ns");
-        wait(mmcm0Locked == 1'b1 && mmcm1Locked == 1'b1);
+        wait_lock(mmcm0Locked, mmcm1Locked);
         @(posedge txClkFabric);
         txClkFabricTime = $realtime;
         @(posedge txClk);
@@ -75,9 +70,9 @@ module clockCheck;
 
         assert((txClkFabricTime + 1.5) == txClkPhyTime) else $fatal("TX clock skew of 1.5ns not achieved. Measured skew = ", (txClkPhyTime    - txClkFabricTime));
         assert((rxClkPhyTime + 1.5) == rxClkFabricTime) else $fatal("RX clock skew of 1.5ns not achieved. Measured skew = ", (rxClkFabricTime - rxClkPhyTime));
-        $display("Measured clock skew: ", txClkPhyTime    - txClkFabricTime, "ns");
-        $display("Measured clock skew: ", rxClkFabricTime - rxClkPhyTime,    "ns");
-        $display("This test ran");
+        $display("TX measured clock skew: ", txClkPhyTime    - txClkFabricTime, "ns");
+        $display("RX measured clock skew: ", rxClkFabricTime - rxClkPhyTime,    "ns");
+        $display(" --- TEST PASSED ---");
         $finish;
     end
 
