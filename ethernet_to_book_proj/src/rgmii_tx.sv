@@ -4,7 +4,7 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-module RGMII_TX (
+module rgmii_tx (
     input  logic rstIn,
     input  logic clk125In,
     input  logic intBIn,

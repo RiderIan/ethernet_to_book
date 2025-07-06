@@ -3,17 +3,13 @@
 // Dev: Ian Rider
 // Purpose: Verify data to clock skew of RMGII TX and RX is 1.0ns-2.6ns 
 //////////////////////////////////////////////////////////////////////////////////
-`include "tasks.sv"
+import tb_pkg::*;
 
-module clockCheck;
-
-    const int CLK_100_MHX_PERIOD = 10;
-    const int CLK_125_MHZ_PERIOD = 8;
+module tb_clock_test;
 
     logic       clk100       = 0;
     logic       rst          = 1;
     logic       rstLcl;
-    logic       clkLcl;
     logic       clk250;
 
     logic [3:0] rxData;
@@ -36,28 +32,29 @@ module clockCheck;
     real        rxClkFabricTime;
     real        rxClkPhyTime;
 
-    // Clock gen
-    always #(CLK_100_MHX_PERIOD/2) clk100 = ~clk100;
-    always #(CLK_125_MHZ_PERIOD/2) rxClk  = ~rxClk;
+    // ENV
+    tb_env env (
+        .rstOut(rst),
+        .clk100Out(clk100),
+        .rxClkOut(rxClk));
 
     // DUT
-    CLKS_RSTS dut (
+    clks_rsts dut (
         .rstIn(rst),
         .clkIn(clk100),
         .rxClkIn(rxClk),
         .rstLclOut(rstLcl),
-        .clkLclOut(clkLcl),
-        .clk125TxOut(txClkFabric),
+        .txClkLclOut(txClkFabric),
         .txClkOut(txClk),
         .clk250Out(clk250),
-        .clk125RxOut(rxClkFabric),
+        .rxClkLclOut(rxClkFabric),
         .mmcm0LockedOut(mmcm0Locked),
         .mmcm1LockedOut(mmcm1Locked));
 
     initial begin
-        init_reset(rst);
+        @(negedge rstLcl);
         $display("Waiting for both mmcms lock - ", $realtime, "ns");
-        wait_lock(mmcm0Locked, mmcm1Locked);
+        wait_mmcm_locks(mmcm0Locked, mmcm1Locked);
         @(posedge txClkFabric);
         txClkFabricTime = $realtime;
         @(posedge txClk);
