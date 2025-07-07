@@ -13,7 +13,10 @@ module rgmii_rx_test;
     logic              rxClk;
 
     // Clock and reset signals
-    logic              rstlcl;
+    logic              rstTxLcl;
+    logic              rstTx;
+    logic              rst250;
+    logic              rstRxLcl;
     logic              txClkLcl;
     logic              txClk;
     logic              clk250;
@@ -50,7 +53,10 @@ module rgmii_rx_test;
         .rstIn(rst),
         .clkIn(clk100),
         .rxClkIn(rxClk),
-        .rstLclOut(rstLcl),
+        .rstTxLclOut(rstTxLcl),
+        .rstTxOut(rstTx),
+        .rst250Out(rst250),
+        .rstRxLclOut(rstRxLcl),
         .txClkLclOut(txClkLcl),
         .txClkOut(txClk),
         .clk250Out(clk250),
@@ -60,7 +66,7 @@ module rgmii_rx_test;
 
     initial begin : frame_gen_proc
         rxIf.reset();
-        @(negedge rstLcl);
+        @(negedge rstRxLcl);
         $display("Waiting for both mmcms lock - ", $realtime, "ns");
         wait_mmcm_locks(mmcm0Locked, mmcm1Locked);
 

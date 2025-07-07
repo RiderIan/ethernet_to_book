@@ -20,4 +20,8 @@ set_false_path -to   [get_ports {*Bi}]
 set_false_path -from [get_ports {*Bi}]
 
 # CDCs
-set_max_delay 4 -from [get_clocks rx_clk_125_dly] -to [get_clocks clk_250] -data_path_only
+set_false_path  -from    [get_clocks rx_clk_125_dly] -to [get_clocks clk_250]
+set_false_path  -from    [get_clocks clk_250]        -to [get_clocks rx_clk_125_dly]
+set_max_delay 4 -from    [get_clocks rx_clk_125_dly] -to [get_clocks clk_250]         -datapath_only
+set_max_delay 4 -from    [get_clocks clk_250]        -to [get_clocks rx_clk_125_dly]  -datapath_only
+set_false_path  -through [get_cells -hierarchical -filter {NAME =~ "*xpm_fifo_async_inst*" && NAME =~ "*fifo_rd_rst_ic_reg*"}]

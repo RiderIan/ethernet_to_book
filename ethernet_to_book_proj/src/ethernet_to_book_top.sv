@@ -25,7 +25,10 @@ module ethernet_to_book_top (
     output logic       phyRstBOut);
 
     // Signals
-    logic       rstLcl;
+    logic       rstTxLcl;    
+    logic       rstTx;
+    logic       rst250;
+    logic       rstRxLcl;
     logic       txClkLcl;
     logic       rxClkLcl;
     logic       clk250;
@@ -36,14 +39,24 @@ module ethernet_to_book_top (
     logic       rxDataValid;
     logic       rxDataLast;
 
+    logic       udpRdEn;
+    logic       rdEmpty;
+    logic       rx250Data;
+    logic       rdRstBusy;
+    logic       wrRstBusy;
+    logic       wrFull;
+
     ////////////////////////////////////////////
     // Clocks and Resets
     ////////////////////////////////////////////
-    clks_rsts clks_rsts_inst (
+    (* keep_hierarchy = "yes" *) clks_rsts clks_rsts_inst (
         .rstIn(rstIn),
         .clkIn(clkIn),
         .rxClkIn(rxClkIn),
-        .rstLclOut(rstLcl),
+        .rstTxLclOut(rstTxLcl),
+        .rstTxOut(rstTx),
+        .rst250Out(rst250),
+        .rstRxLclOut(rstRxLcl),
         .txClkLclOut(txClkLcl),
         .txClkOut(txClkOut),
         .clk250Out(clk250),
@@ -51,31 +64,44 @@ module ethernet_to_book_top (
         .mmcm0LockedOut(mmcm0Locked),
         .mmcm1LockedOut(mmcm1Locked));
 
-    assign phyRstBOut = rstLcl; // may want more logic driving this
+    assign phyRstBOut = rstTx; // may want more logic driving this
 
     ////////////////////////////////////////////
     // RGMII
     ////////////////////////////////////////////
-    rgmii mac_inst (
-        .rstIn(rstLcl),
+    (* keep_hierarchy = "yes" *) rgmii mac_inst (
         .intBIn(intBIn),
         .mmcm0LockedIn(mmcm0Locked),
         .mmcm1LockedIn(mmcm1Locked),
 
+        .rstRxLclIn(rstRxLcl),
         .rxClkIn(rxClkLcl),
+        .rxDataIn(rxDataIn),
         .rxCtrlIn(rxCtrlIn),
         .rxDataOut(rxData),
         .rxDataValidOut(rxDataValid),
         .rxDataLastOut(rxDataLast),
 
+        .rstTxLclIn(rstTxLcl),
         .clk125In(txClkLcl),
         .txDataOut(txDataOut),
-        .txCtrlOut(txCtrlOut),
-        .phyRstBOut(phyRstBOut));
+        .txCtrlOut(txCtrlOut));
 
     ////////////////////////////////////////////
     // rxClkLcl(125Mhz) -> 250Mhz CDC
     ////////////////////////////////////////////
+    (* keep_hierarchy = "yes" *) fifo_cdc slow_fast_cdc_inst (
+        .wrRstIn(rstRxLcl),        
+        .wrClkIn(rxClkLcl),
+        .wrEnIn(rxDataValid),
+        .wrDataIn(rxData),
+        .wrFullOut(wrFull),
+        .wrRstBusyOut(wrRstBusy),
+        .rdClkIn(clk250),
+        .rdEnIn(udpRdEn),
+        .rdEmptyOut(rdEmpty),
+        .rdDataOut(rx250Data),
+        .rdRstBusyOut(rdRstBusy));
 
     ////////////////////////////////////////////
     // Ethernet/IP/UDP/MoldUdp64 header parser

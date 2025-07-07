@@ -6,15 +6,7 @@
 `include "rgmii_rx.sv"
 `include "rgmii_tx.sv"
 
-module udp_parser (
-    input logic       rstIn,
-    input logic       clkIn,
-    input logic [7:0] rxDataIn,
-    input logic       rxDataValidIn,
-    input logic       rxDataLastIn,
-
-    output logic [ 7:0] itchDataOut,
-    output logic [15:0] itchMsgLenOut);
+module udp_parser ();
 
     // Header byte offsets that matter
     const int DEST_MAC     = 0;
