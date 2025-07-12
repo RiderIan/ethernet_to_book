@@ -6,7 +6,16 @@
 `include "rgmii_rx.sv"
 `include "rgmii_tx.sv"
 
-module udp_parser ();
+module udp_parser (
+    input logic rstIn,
+    input logic clkIn,
+
+    // Fifo control
+    output logic rdEnOut,
+    input  logic rdEmptyIn,
+
+
+);
 
     // Header byte offsets that matter
     const int DEST_MAC     = 0;

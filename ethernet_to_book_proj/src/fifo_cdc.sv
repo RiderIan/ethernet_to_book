@@ -3,61 +3,123 @@
 // Dev: Ian Rider
 // Purpose: Generate local clocks with 100Mhz board clock and 125Mhz PHY rxClk
 //////////////////////////////////////////////////////////////////////////////////
+import pkg::*;
 
-// TODO: Replace this with custom async fifo that is only 4 deep
-
-module fifo_cdc (
+module fifo_cdc # (
+    parameter logic XPERIMENTAL_LOW_LAT_CDC = 1'b0, // TRUE:  Grey-code tagged CDC (not verified) FALSE: Traditional async fifo CDC
+    parameter int   GREY_WIDTH  = 8)                // Width of grey-code counter appened to data, wider=safer?
+(
     input  logic       wrRstIn,
     input  logic       wrClkIn,
     input  logic       wrEnIn,
     input  logic [7:0] wrDataIn,
-    output logic       wrFullOut,
-    output logic       wrRstBusyOut,
 
+    input  logic       rdRstIn,
     input  logic       rdClkIn,
-    input  logic       rdEnIn,
     output logic [7:0] rdDataOut,
-    output logic       rdEmptyOut,
-    output logic       rdRstBusyOut);
+    output logic       rdDataValidOut);
 
-    logic wrEn;
-    logic wrFull;
-    logic wrRstBusy;
-    logic rdEn;
-    logic rdEmpty;
-    logic rdRstBusy;
 
-    // Should never be full as 250 domain will constantly read when not empty
-    assign wrEn = (wrEnIn & ~wrFull  & ~wrRstBusy & ~rdRstBusy);
-    assign rdEn = (rdEnIn & ~rdEmpty & ~wrRstBusy & ~rdRstBusy);
+    generate 
+        if (XPERIMENTAL_LOW_LAT_CDC) begin
+            // GREY-CODE TAGGED CDC (lower latency but probably not as safe as async fifio)
+            localparam int MAX_GREY_CNT = (1 << GREY_WIDTH) - 1;
+            logic [GREY_WIDTH+7:0] dataGreyR; 
+            logic [GREY_WIDTH+7:0] dataEncodR; 
+            logic [GREY_WIDTH+7:0] dataEncodRR;
+            logic [GREY_WIDTH+7:0] dataEncodRRR;
+            logic [GREY_WIDTH-1:0]   greyAppendR;
+            logic [GREY_WIDTH-1:0]   nextGreyR;
+            logic                  newGrey;
+            logic                  newGreyR;
+            logic [GREY_WIDTH-1:0]   cntSlow;
+            logic [GREY_WIDTH-1:0]   cntFast;
+
+            ////////////////////////////////////////////
+            // Write side (slow)
+            ////////////////////////////////////////////
+            always_ff @(posedge wrClkIn) begin
+                if (wrRstIn) begin
+                    cntSlow     <= 2'b10;
+                    greyAppendR <= 1'b1;
+                    dataGreyR   <= 1'b0;
+                end else begin
+                    if (wrEnIn) begin
+                        dataGreyR   <= {greyAppendR, wrDataIn};
+                        greyAppendR <= cntSlow ^ (cntSlow >> 1);// grey_code#(GREY_WIDTH)::bin_to_grey(cntSlow);
+                        cntSlow     <= cntSlow + 1'b1;
+                    end
+                end
+            end
+
+            ////////////////////////////////////////////
+            // Read side (fast)
+            ////////////////////////////////////////////
+            // Synchonizer
+            always_ff @(posedge rdClkIn) begin
+                dataEncodR   <= dataGreyR;
+                dataEncodRR  <= dataEncodR;
+                dataEncodRRR <= dataEncodRR;
+                // Needs to be delayed a clock to let data get through sycnhronizer
+                newGreyR     <= newGrey;
+            end
+
+            // Might be un-safe comparison of non-synchronized signal
+            assign newGrey        = (dataEncodRRR[GREY_WIDTH+7:8] != dataEncodRR[GREY_WIDTH+7:8]);
+            assign rdDataValidOut = (dataEncodRRR[GREY_WIDTH+7:8] == nextGreyR);
+            assign rdDataOut      = dataEncodRRR[7:0];
+
+            // Calculate grey-code
+            always_ff @(posedge rdClkIn) begin
+                if (rdRstIn) begin
+                    cntFast   <= 2'b10;
+                    nextGreyR <= 1'b1; // Grey code initalized to 0 so first expected is 1
+                end else begin
+                    if (newGreyR) begin
+                        nextGreyR <= cntFast ^ (cntFast >> 1);//grey_code#(GREY_WIDTH)::bin_to_grey(cntFast);
+                        cntFast   <= cntFast + 1;
+                    end
+                end
+            end
     
-    // May want to implement custom 4-deep async fifo to reduce latency
-    xpm_fifo_async #(
-        .FIFO_MEMORY_TYPE("distributed"),
-        .FIFO_WRITE_DEPTH(16),
-        .READ_DATA_WIDTH(8),
-        .SIM_ASSERT_CHK(1),
-        .WRITE_DATA_WIDTH(8)) 
-    xpm_fifo_async_inst (
-        .rst(1'b0),               // Write domain
+        end else begin
+            // ASYNC FIFO
+            logic wrEn;
+            logic wrFull;
+            logic wrRstBusy;
+            logic rdEn;
+            logic rdEmpty;
+            logic rdRstBusy;
+            // Should never be full as 250 domain will constantly read when not empty
+            assign wrEn = (wrEnIn   & ~wrFull    & ~wrRstBusy & ~rdRstBusy);
+            assign rdEn = (~rdEmpty & ~wrRstBusy & ~rdRstBusy);
 
-        // Write domain 125Mhz
-        .wr_clk(wrClkIn),         // In
-        .wr_en(wrEn),             // In
-        .din(wrDataIn),           // In
-        .full(wrFull),            // Out
-        .wr_rst_busy(wrRstBusy),  // Out
+            xpm_fifo_async #(
+                .FIFO_MEMORY_TYPE("distributed"),
+                .FIFO_WRITE_DEPTH(16),
+                .READ_DATA_WIDTH(8),
+                .READ_MODE("fwft"),
+                .SIM_ASSERT_CHK(1),
+                .WRITE_DATA_WIDTH(8)) 
+            xpm_fifo_async_inst (
+                .rst(wrRstIn),            // Write domain
 
-        // Read domain 250Mhz
-        .rd_clk(rdClkIn),         // In
-        .rd_en(rdEn),             // In
-        .empty(rdEmpty),          // Out
-        .dout(rdDataOut),         // Out
-        .rd_rst_busy(rdRstBusy)); // Out
+                // Write domain 125Mhz
+                .wr_clk(wrClkIn),         // In
+                .wr_en(wrEn),             // In
+                .din(wrDataIn),           // In
+                .full(wrFull),            // Out
+                .wr_rst_busy(wrRstBusy),  // Out
 
-    assign wrRstBusyOut = wrRstBusy;
-    assign wrFullOut    = wrFull;
-    assign rdEmptyOut   = rdEmpty;
-    assign rdRstBusyOut = rdRstBusy;
+                // Read domain 250Mhz
+                .rd_clk(rdClkIn),         // In
+                .rd_en(rdEn),             // In
+                .empty(rdEmpty),          // Out
+                .dout(rdDataOut),         // Out
+                .rd_rst_busy(rdRstBusy)); // Out
+
+            assign rdDataValidOut = rdEn;
+        end
+    endgenerate
 
 endmodule

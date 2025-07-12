@@ -5,6 +5,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 `include "rgmii.sv"
 `include "clks_rsts.sv"
+`include "pkg.sv"
 
 module ethernet_to_book_top (
 
@@ -39,12 +40,8 @@ module ethernet_to_book_top (
     logic       rxDataValid;
     logic       rxDataLast;
 
-    logic       udpRdEn;
-    logic       rdEmpty;
     logic       rx250Data;
-    logic       rdRstBusy;
-    logic       wrRstBusy;
-    logic       wrFull;
+    logic       rdDataValid;
 
     ////////////////////////////////////////////
     // Clocks and Resets
@@ -90,30 +87,21 @@ module ethernet_to_book_top (
     ////////////////////////////////////////////
     // rxClkLcl(125Mhz) -> 250Mhz CDC
     ////////////////////////////////////////////
-    (* keep_hierarchy = "yes" *) fifo_cdc slow_fast_cdc_inst (
+    (* keep_hierarchy = "yes" *) fifo_cdc #(
+        .XPERIMENTAL_LOW_LAT_CDC(1'b1))
+    slow_fast_cdc_inst (
         .wrRstIn(rstRxLcl),        
         .wrClkIn(rxClkLcl),
         .wrEnIn(rxDataValid),
         .wrDataIn(rxData),
-        .wrFullOut(wrFull),
-        .wrRstBusyOut(wrRstBusy),
+        .rdRstIn(rst250),
         .rdClkIn(clk250),
-        .rdEnIn(udpRdEn),
-        .rdEmptyOut(rdEmpty),
         .rdDataOut(rx250Data),
-        .rdRstBusyOut(rdRstBusy));
+        .rdDataValidOut(rdDataValid));
 
     ////////////////////////////////////////////
     // Ethernet/IP/UDP/MoldUdp64 header parser
     ////////////////////////////////////////////
-    // udp_parser udp_inst (
-    //     .rstIn(rstLcl),
-    //     .clkIn(clk250),
-    //     .rxDataIn()
-    //     .rxDataValidIn,
-    //     .rxDataLastIn,
-    //     .itchDataOut,
-    //     .itchMsgLenOut
-    // )
+    
 
 endmodule
