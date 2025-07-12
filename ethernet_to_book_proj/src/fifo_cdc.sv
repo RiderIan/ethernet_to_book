@@ -23,18 +23,18 @@ module fifo_cdc # (
     generate 
         if (XPERIMENTAL_LOW_LAT_CDC) begin
             // GREY-CODE TAGGED CDC (lower latency but probably not as safe as async fifio)
-            // Latency is about 14ns-15ns (depends on phase relationship) compared to ~34ns latency of FIFO
+            // Latency is about 14ns-16ns (depends on phase relationship) compared to ~34ns latency of FIFO
             localparam int MAX_GREY_CNT = (1 << GREY_WIDTH) - 1;
             logic [GREY_WIDTH+7:0] dataGreyR; 
             logic [GREY_WIDTH+7:0] dataEncodR; 
             logic [GREY_WIDTH+7:0] dataEncodRR;
             logic [GREY_WIDTH+7:0] dataEncodRRR;
-            logic [GREY_WIDTH-1:0]   greyAppendR;
-            logic [GREY_WIDTH-1:0]   nextGreyR;
+            logic [GREY_WIDTH-1:0] greyAppendR;
+            logic [GREY_WIDTH-1:0] nextGreyR;
             logic                  newGrey;
             logic                  newGreyR;
-            logic [GREY_WIDTH-1:0]   cntSlow;
-            logic [GREY_WIDTH-1:0]   cntFast;
+            logic [GREY_WIDTH-1:0] cntSlow;
+            logic [GREY_WIDTH-1:0] cntFast;
 
             ////////////////////////////////////////////
             // Write side (slow)
