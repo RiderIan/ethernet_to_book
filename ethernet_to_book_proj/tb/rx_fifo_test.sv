@@ -46,7 +46,7 @@ module rx_fifo_test;
     // Generate random phase relationship to slower clock each run
     initial begin : clk_phase_offset
         real clkOffsetNs;
-        clkOffsetNs = $urandom_range(0, CLK_250_MHZ_PERIOD*100) / 400.0; // 0.00ns to 4.00ns
+        clkOffsetNs = $urandom_range(0, CLK_250_MHZ_PERIOD*100) / 400.000; // 0.00ns to 4.00ns
         #(clkOffsetNs);
 
         forever begin
