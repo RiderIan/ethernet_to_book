@@ -20,13 +20,13 @@ module rx_fifo_test;
     logic [7:0] rx250Data;
     logic       rdDataValid;
 
-    real        writeTime;
-    real        readTime;
+    real        writeTime[0:499];
+    real        readTime[0:499];
 
     ////////////////////////////////////////////
     // DUT: rxClkLcl(125Mhz) -> 250Mhz CDC
     ////////////////////////////////////////////
-    fifo_cdc # (
+    slow_fast_cdc # (
         .XPERIMENTAL_LOW_LAT_CDC(1'b1))
     dut (
         .wrRstIn(rstRxLcl),        
@@ -45,8 +45,8 @@ module rx_fifo_test;
     always #(CLK_125_MHX_PERIOD/2) clk125 = ~clk125;
     // Generate random phase relationship to slower clock each run
     initial begin : clk_phase_offset
-        real clkOffsetNs;
-        clkOffsetNs = $urandom_range(0, CLK_250_MHZ_PERIOD*100) / 400.000; // 0.00ns to 4.00ns
+        int randInit = $urandom(1); // Not actually random so this needs to be changed manually :(
+        real clkOffsetNs = $urandom_range(0, CLK_250_MHZ_PERIOD*100) / 400.000; // 0.00ns to 4.00ns
         #(clkOffsetNs);
 
         forever begin
@@ -69,7 +69,7 @@ module rx_fifo_test;
 
         for (int i = 0; i < 500; i++) begin
             @(posedge clk125);
-            writeTime = $realtime();
+            writeTime[i] = $realtime();
             rxData = i[7:0];
             rxDataValid = 1'b1;
         end
@@ -88,9 +88,9 @@ module rx_fifo_test;
             @(posedge clk250);
             if (rdDataValid) begin
                 assert(rx250Data == i[7:0]) else $fatal("Byte Received: 0x%H", rx250Data, " Expected: 0x%H", i[7:0], "  INCORRECT :(");
-                readTime = $realtime();
+                readTime[i] = $realtime();
                 $display("Byte Received: 0x%H", rx250Data, " Expected: 0x%H", i[7:0], "  CORRECT :)");
-                $display("Write to read latency: ", readTime - writeTime);
+                $display("Write to read latency: ", readTime[i] - writeTime[i]);
                 i++;
             end
         end

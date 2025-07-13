@@ -85,9 +85,9 @@ module ethernet_to_book_top (
         .txCtrlOut(txCtrlOut));
 
     ////////////////////////////////////////////
-    // rxClkLcl(125Mhz) -> 250Mhz CDC
+    // CDC slow (125MHz) -> fast (250MHz+)
     ////////////////////////////////////////////
-    (* keep_hierarchy = "yes" *) fifo_cdc #(
+    (* keep_hierarchy = "yes" *) slow_fast_cdc #(
         .XPERIMENTAL_LOW_LAT_CDC(1'b1))
     slow_fast_cdc_inst (
         .wrRstIn(rstRxLcl),        

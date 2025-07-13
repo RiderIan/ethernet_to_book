@@ -5,7 +5,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 import pkg::*;
 
-module fifo_cdc # (
+module slow_fast_cdc # (
     parameter logic XPERIMENTAL_LOW_LAT_CDC = 1'b0, // TRUE:  Grey-code tagged CDC (not verified) FALSE: Traditional async fifo CDC
     parameter int   GREY_WIDTH  = 8)                // Width of grey-code counter appened to data, wider=safer?
 (
@@ -24,17 +24,9 @@ module fifo_cdc # (
         if (XPERIMENTAL_LOW_LAT_CDC) begin
             // GREY-CODE TAGGED CDC (lower latency but probably not as safe as async fifio)
             // Latency is about 14ns-16ns (depends on phase relationship) compared to ~34ns latency of FIFO
-            localparam int MAX_GREY_CNT = (1 << GREY_WIDTH) - 1;
-            logic [GREY_WIDTH+7:0] dataGreyR; 
-            logic [GREY_WIDTH+7:0] dataEncodR; 
-            logic [GREY_WIDTH+7:0] dataEncodRR;
-            logic [GREY_WIDTH+7:0] dataEncodRRR;
-            logic [GREY_WIDTH-1:0] greyAppendR;
-            logic [GREY_WIDTH-1:0] nextGreyR;
-            logic                  newGrey;
-            logic                  newGreyR;
-            logic [GREY_WIDTH-1:0] cntSlow;
-            logic [GREY_WIDTH-1:0] cntFast;
+            logic [GREY_WIDTH+7:0] dataGreyR, dataEncodR, dataEncodRR, dataEncodRRR; 
+            logic [GREY_WIDTH-1:0] greyAppendR, nextGreyR, cntSlow, cntFast;
+            logic                  newGrey, newGreyR;
 
             ////////////////////////////////////////////
             // Write side (slow)
@@ -47,7 +39,7 @@ module fifo_cdc # (
                 end else begin
                     if (wrEnIn) begin
                         dataGreyR   <= {greyAppendR, wrDataIn};
-                        greyAppendR <= cntSlow ^ (cntSlow >> 1);// grey_code#(GREY_WIDTH)::bin_to_grey(cntSlow);
+                        greyAppendR <= cntSlow ^ (cntSlow >> 1); // Convert to grey
                         cntSlow     <= cntSlow + 1'b1;
                     end
                 end
@@ -65,11 +57,6 @@ module fifo_cdc # (
                 newGreyR     <= newGrey;
             end
 
-            // Only detect new grey-code on first two stable samples
-            assign newGrey        = (dataEncodRRR[GREY_WIDTH+7:8] != dataEncodRR[GREY_WIDTH+7:8]);
-            assign rdDataValidOut = (dataEncodRRR[GREY_WIDTH+7:8] == nextGreyR);
-            assign rdDataOut      = dataEncodRRR[7:0];
-
             // Calculate grey-code
             always_ff @(posedge rdClkIn) begin
                 if (rdRstIn) begin
@@ -77,11 +64,16 @@ module fifo_cdc # (
                     nextGreyR <= 1'b1; // Grey code initalized to 0 so first expected is 1
                 end else begin
                     if (newGreyR) begin
-                        nextGreyR <= cntFast ^ (cntFast >> 1);//grey_code#(GREY_WIDTH)::bin_to_grey(cntFast);
+                        nextGreyR <= cntFast ^ (cntFast >> 1); // Convert to grey
                         cntFast   <= cntFast + 1;
                     end
                 end
             end
+
+            // Only detect new grey-code on first two stable samples
+            assign newGrey        = (dataEncodRRR[GREY_WIDTH+7:8] != dataEncodRR[GREY_WIDTH+7:8]);
+            assign rdDataValidOut = (dataEncodRRR[GREY_WIDTH+7:8] == nextGreyR);
+            assign rdDataOut      = dataEncodRRR[7:0];
     
         end else begin
             // ASYNC FIFO
