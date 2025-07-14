@@ -14,7 +14,7 @@ module rgmii_rx (
     
     output logic [7:0] rxDataOut,
     output logic       rxDataValidOut,
-    output logic       rxDataLastOut);
+    output logic       rxDataLastOut); // unused
 
     logic ctrlRising;
     logic ctrlFalling;

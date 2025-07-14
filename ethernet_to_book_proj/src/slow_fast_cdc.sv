@@ -3,7 +3,6 @@
 // Dev: Ian Rider
 // Purpose: Generate local clocks with 100Mhz board clock and 125Mhz PHY rxClk
 //////////////////////////////////////////////////////////////////////////////////
-import pkg::*;
 
 module slow_fast_cdc # (
     parameter logic XPERIMENTAL_LOW_LAT_CDC = 1'b0, // TRUE:  Grey-code tagged CDC (not verified) FALSE: Traditional async fifo CDC
@@ -17,7 +16,8 @@ module slow_fast_cdc # (
     input  logic       rdRstIn,
     input  logic       rdClkIn,
     output logic [7:0] rdDataOut,
-    output logic       rdDataValidOut);
+    output logic       rdDataValidOut,
+    output logic       rdDataErrOut);
 
 
     generate 
@@ -35,7 +35,7 @@ module slow_fast_cdc # (
                 if (wrRstIn) begin
                     cntSlow     <= 2'b10;
                     greyAppendR <= 1'b1;
-                    dataGreyR   <= 1'b0;
+                    dataGreyR   <= '0;
                 end else begin
                     if (wrEnIn) begin
                         dataGreyR   <= {greyAppendR, wrDataIn};
@@ -50,11 +50,16 @@ module slow_fast_cdc # (
             ////////////////////////////////////////////
             // Synchonizer
             always_ff @(posedge rdClkIn) begin
-                dataEncodR   <= dataGreyR;
-                dataEncodRR  <= dataEncodR;
-                dataEncodRRR <= dataEncodRR;
-                // Needs to be delayed a clock to let data get through sycnhronizer
-                newGreyR     <= newGrey;
+                // Only rst bc control signals assigned concurrently based off these
+                if (rdRstIn) begin
+                    dataEncodR   <= '0;
+                    dataEncodRR  <= '0; 
+                    dataEncodRRR <= '0;
+                end else begin
+                    dataEncodR   <= dataGreyR;
+                    dataEncodRR  <= dataEncodR;
+                    dataEncodRRR <= dataEncodRR;
+                end
             end
 
             // Calculate grey-code
@@ -62,7 +67,11 @@ module slow_fast_cdc # (
                 if (rdRstIn) begin
                     cntFast   <= 2'b10;
                     nextGreyR <= 1'b1; // Grey code initalized to 0 so first expected is 1
+                    newGreyR  <= 1'b0;
                 end else begin
+                    // Needs to be delayed a clock to let data get through sycnhronizer
+                    newGreyR     <= newGrey;
+
                     if (newGreyR) begin
                         nextGreyR <= cntFast ^ (cntFast >> 1); // Convert to grey
                         cntFast   <= cntFast + 1;
@@ -71,8 +80,10 @@ module slow_fast_cdc # (
             end
 
             // Only detect new grey-code on first two stable samples
+            // Using 'R' and 'RR' works in sim but comparing on an unstable signal is bad practice
             assign newGrey        = (dataEncodRRR[GREY_WIDTH+7:8] != dataEncodRR[GREY_WIDTH+7:8]);
-            assign rdDataValidOut = (dataEncodRRR[GREY_WIDTH+7:8] == nextGreyR);
+            assign rdDataValidOut = ((dataEncodRRR[GREY_WIDTH+7:8] == nextGreyR) & newGreyR);
+            assign rdDataErrOut   = ((dataEncodRRR[GREY_WIDTH+7:8] != nextGreyR) & newGreyR);
             assign rdDataOut      = dataEncodRRR[7:0];
     
         end else begin

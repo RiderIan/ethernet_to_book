@@ -5,7 +5,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 `include "rgmii.sv"
 `include "clks_rsts.sv"
-`include "pkg.sv"
+`include "eth_udp_parser.sv"
 
 module ethernet_to_book_top (
 
@@ -26,22 +26,11 @@ module ethernet_to_book_top (
     output logic       phyRstBOut);
 
     // Signals
-    logic       rstTxLcl;    
-    logic       rstTx;
-    logic       rst250;
-    logic       rstRxLcl;
-    logic       txClkLcl;
-    logic       rxClkLcl;
-    logic       clk250;
-    logic       mmcm0Locked; 
-    logic       mmcm1Locked;
-
-    logic [7:0] rxData;
-    logic       rxDataValid;
-    logic       rxDataLast;
-
-    logic       rx250Data;
-    logic       rdDataValid;
+    logic       rstTxLcl,    rstTx,       rst250, rstRxLcl;    
+    logic       txClkLcl,    rxClkLcl,    clk250;
+    logic       mmcm0Locked, mmcm1Locked; 
+    logic [7:0] rxData,      rx250Data;
+    logic       rxDataValid, rdDataValid, rdDataErr;
 
     ////////////////////////////////////////////
     // Clocks and Resets
@@ -77,7 +66,6 @@ module ethernet_to_book_top (
         .rxCtrlIn(rxCtrlIn),
         .rxDataOut(rxData),
         .rxDataValidOut(rxDataValid),
-        .rxDataLastOut(rxDataLast),
 
         .rstTxLclIn(rstTxLcl),
         .clk125In(txClkLcl),
@@ -97,11 +85,18 @@ module ethernet_to_book_top (
         .rdRstIn(rst250),
         .rdClkIn(clk250),
         .rdDataOut(rx250Data),
-        .rdDataValidOut(rdDataValid));
+        .rdDataValidOut(rdDataValid),
+        .rdDataErrOut(rdDataErr));
 
     ////////////////////////////////////////////
     // Ethernet/IP/UDP/MoldUdp64 header parser
     ////////////////////////////////////////////
+    (* keep_hierarchy = "yes" *) eth_udp_parser eth_udp_parser_inst (
+        .rstIn(rst250),
+        .clkIn(clk250),
+        .dataIn(rx250Data),
+        .dataValidIn(rdDataValid),
+        .dataErrIn(rdDataErr));
     
 
 endmodule
