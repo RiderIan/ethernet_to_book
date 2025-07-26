@@ -15,6 +15,28 @@ interface rgmii_rx_if(input rxClk);
     endtask
 endinterface
 
+interface eth_udp_if(input clk);
+    logic [7:0] data;
+    logic       dataValid;
+    logic       dataErr;
+
+    task automatic reset();
+        dataValid = 1'b0;
+        dataErr   = 1'b0;
+        data      = 8'h00;
+    endtask;
+endinterface
+
+interface eth_udp_output_if(input clk);
+    logic [7:0] data;
+    logic       dataValid;
+
+    task automatic reset();
+        dataValid = 1'b0;
+        data      = 8'h00;
+    endtask;
+endinterface
+
 // Output interface of RGMII module as seen by upstream logic
 interface rgmii_rx_output_if(input rxClkLcl);
     logic       rxDataValid;

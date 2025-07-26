@@ -72,7 +72,7 @@ module rgmii_rx_test;
 
         // Stream non-stop for max ethernet frame size (ipv4, MoldUdp64, ITCH)
         for(int i = 0; i < 1440; i++)
-            send_byte(rxIf, i);
+            send_rgmii_byte(rxIf, i);
 
         // End frame
         @(posedge rxClk);
@@ -83,7 +83,7 @@ module rgmii_rx_test;
     initial begin : frame_check_proc
         @(posedge rxOIf.rxDataValid);
         for(int i = 0; i < 1440; i++)
-            check_byte(rxOIf, i);
+            check_rgmii_byte(rxOIf, i);
             assert(rxOIf.rxDataLast == 0) else $fatal("Unexpected end of frame :(");
         @(negedge rxOIf.rxDataLast);
         $display(" --- TEST PASSED ---");
