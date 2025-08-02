@@ -3,6 +3,7 @@
 // Dev: Ian Rider
 // Purpose: Parser ethernet and MoldUdp64 headers, pass itch data straight through
 //////////////////////////////////////////////////////////////////////////////////
+import tb_pkg::*;
 
 module eth_udp_parser (
     input  logic       rstIn,
@@ -16,100 +17,115 @@ module eth_udp_parser (
     output logic [7:0] itchDataOut,
     output logic       itchDataValidOut);
 
-    // Header byte offsets that matter
-    const int DEST_MAC     = 0;
-    const int SRC_MAC      = 6;
-    const int ETH_TYPE     = 12;
-    const int TOTAL_LENGTH = 15;
-    const int PROTOCOL     = 17;
-    const int UDP_SRC      = 26;
-    const int UDP_DST      = 28;
-    const int UDP_LENGTH   = 30;
-    const int UDP_CHKSUM   = 32;
-    const int MOLD_SESH    = 34;
-    const int MOLD_SEQ_NUM = 44;
-    const int MOLD_MSG_CNT = 52;
-    const int ITCH_MSG_LEN = 54;
-    const int ITCH_MSG     = 56;
+    // Header byte offsets
+    const int unsigned ETH_HDR_DONE  = 14;
+    const int unsigned IP_HDR_DONE   = 34;
+    const int unsigned UDP_HDR_DONE  = 42;
+    const int unsigned MOLD_HDR_DONE = 62;
+
+    const logic [47:0] DEVICE_MAC        = 48'hA846D2197E2B;
+    const logic [15:0] IP_V4_TYPE        =  8'h0800;
+    const logic [31:0] NYSE_DST_IP       = 32'hE0000000; // NYSE integrated feed multicast dest
+    const logic [15:0] NYSE_UDP_SRC_PORT = 16'h3E80;
+    const logic [15:0] UDP_DEST_PORT     = 16'h2710;
 
     int unsigned byteCntR;
-    logic dataValidR, dataLastDetR, ipV4CheckR, passItchR;
+    // TODO: Find a way to clear all of these check bits after a frame has completed
+    logic dataLastDetR, dstMacCheckR, ipV4CheckR, nyseIpCheck, udpSrcCheckR, udpDstCheckR, passItchR;
 
     ////////////////////////////////////////////
     // Ethernet header capture
     ////////////////////////////////////////////
-    typedef struct packed {
-        logic [47:0] dstMac;
-        logic [47:0] srcMac;
-        logic [15:0] ethType;
-    } ethHeaderType;
     ethHeaderType ethHeaderR;
 
     always_ff @(posedge clkIn) begin : eth_header_capture
-        if (dataValidIn & (byteCntR < (ETH_TYPE + 2)))
+        if (dataValidIn & (byteCntR < ETH_HDR_DONE))
             ethHeaderR <= (ethHeaderR << 8) | dataIn;  
     end
 
-    always_ff @(posedge clkIn) begin : ip_v_4_chk
+    always_ff @(posedge clkIn) begin : eth_header_check
         if (rstIn) begin
-            ipV4CheckR <= 1'b0;
-        end else begin  
-            // Check for IPv4 -> ignore if not
-            if ((byteCntR == (ETH_TYPE+2)) && (ethHeaderR.ethType == 16'h0800))
-                ipV4CheckR <= 1'b1;
-            else
-                ipV4CheckR <= 1'b0;
+            dstMacCheckR <= 1'b0;
+            ipV4CheckR   <= 1'b0;
+        end else begin
+            if (byteCntR == (ETH_HDR_DONE + 1)) begin
+                if (ethHeaderR.dstMac == DEVICE_MAC)
+                    dstMacCheckR <= 1'b1;
+                
+                if (ethHeaderR.ethType == IP_V4_TYPE)
+                    ipV4CheckR <= 1'b1;
+            end
         end
     end
 
     ////////////////////////////////////////////
     // IPv4 header capture
     ////////////////////////////////////////////
-    typedef struct packed {
-        logic [ 7:0] ver;
-        logic [ 7:0] dscpEcn;
-        logic [15:0] len;
-        logic [15:0] id;
-        logic [15:0] flags;
-        logic [ 7:0] ttl;
-        logic [ 7:0] protocol;
-        logic [15:0] chkSum;
-        logic [31:0] srcIp;
-        logic [31:0] dstIp;
-    } ipHeaderType;
     ipHeaderType ipHeaderR;
 
     always_ff @(posedge clkIn) begin : ip_header_capture
-        ipHeaderR <= (ipHeaderR << 8) | dataIn;
+        if (dataValidIn & (byteCntR < IP_HDR_DONE))
+            ipHeaderR <= (ipHeaderR << 8) | dataIn;  
     end
 
+    always_ff @(posedge clkIn) begin : ip_header_check
+        if (rstIn) begin
+            nyseIpCheck <= 1'b0;
+        end else begin
+            if (byteCntR == (IP_HDR_DONE + 1)) begin
+                if (ipHeaderR.dstIp == NYSE_DST_IP)
+                    nyseIpCheck <= 1'b1;
+            end
+        end
+    end
+
+    // TODO: Check IP checksum?
+
     ////////////////////////////////////////////
-    // UDP & MoldUDP64 header capture TODO: Continue here
+    // UDP header capture
     ////////////////////////////////////////////
-    typedef struct packed {
-        logic [15:0] srcPort;
-        logic [15:0] dstPort;
-        logic [15:0] udpLen;
-        logic [15:0] chkSum;
-        logic [79:0] sessId;
-        logic [63:0] seqNum;
-        logic [15:0] msgCnt;
-        logic [15:0] moldLen;
-    } udpHeaderType;
     udpHeaderType udpHeaderR;
 
     always_ff @(posedge clkIn) begin : udp_header_capture
-        if (dataValidIn & (byteCntR < MOLD_MSG_CNT+2))
+        if (dataValidIn & (byteCntR < UDP_HDR_DONE))
             udpHeaderR <= (udpHeaderR << 8) | dataIn; 
     end
 
-    // Look for nyse
-    // always_ff @(posedge clkIn) begin : source_chk
-    //     if (rstIn) begin
-    //     end else begin
-    //         if ((byteCntR == (ETH_TYPE+2)) &&)
-    //     end
-    // end
+    always_ff @(posedge clkIn) begin : udp_header_check
+        if (rstIn) begin
+            udpSrcCheckR <= 1'b0;
+            udpDstCheckR <= 1'b0;
+        end else begin
+            if (byteCntR == (UDP_HDR_DONE + 1)) begin
+                if (udpHeaderR.srcPort == NYSE_UDP_SRC_PORT)
+                    udpSrcCheckR <= 1'b1;
+                
+                if (udpHeaderR.dstPort == UDP_DEST_PORT)
+                    udpDstCheckR <= 1'b1;
+            end
+        end
+    end
+
+    // TODO: UDP checksum?
+
+    ////////////////////////////////////////////
+    // MoldUDP64 header capture
+    ////////////////////////////////////////////
+    moldHeaderType moldHeaderR;
+
+    always_ff @(posedge clkIn) begin : mold_header_capture
+        if (dataValidIn & (byteCntR < MOLD_HDR_DONE))
+            moldHeaderR <= (moldHeaderR << 8) | dataIn; 
+    end
+
+    // TODO: implement sessionID/sequence number checker
+    always_ff @(posedge clkIn) begin : mold_header_check
+        if (rstIn) begin
+
+        end else begin
+
+        end
+    end
 
     ////////////////////////////////////////////
     // ITCH passthrough control TODO: Drive passItchR here
@@ -132,9 +148,6 @@ module eth_udp_parser (
             end
         end
     end
-
-
-
 
 
 endmodule
