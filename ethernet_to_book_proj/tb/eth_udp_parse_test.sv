@@ -9,7 +9,7 @@ module eth_udp_parse_test;
 
     const int CLK_250_MHZ_PERIOD = 4;
 
-    const int ETH_HEADER_LEN     = 14; // Npt included in IP length
+    const int ETH_HEADER_LEN     = 14; // Not included in IP length
     const int IP_HEADER_LEN      = 20;
     const int UDP_HEADER_LEN     = 8;
     const int MOLD_HEADER_LEN    = 20;
@@ -50,6 +50,18 @@ module eth_udp_parse_test;
     logic [15:0] moldLen   = ITCH_DATA_LEN[15:0];            // Number of data bytes
     moldHeaderType moldHdr = {sessionId, seqNum, msgCnt, moldLen};
 
+    // ITCH Data
+    // itchDataType itchData;
+    // itchData.msgType    =;
+    // itchData.locate     =;
+    // itchData.trackNum   =;
+    // itchData.timeStamp  =;
+    // itchData.refNum     =;
+    // itchData.buySell    =;
+    // itchData.shares     =;
+    // itchData.stock      =;
+    // itchData.price      =;
+
 
 
     logic [7:0] itchData;
@@ -88,7 +100,8 @@ module eth_udp_parse_test;
         send_ip_header(parserIf,  ipHdr);
         send_udp_header(parserIf, udpHdr);
         send_mold_header(parserIf, moldHdr);
-
+       
+        @(posedge parserIf.clk);
         parserIf.dataValid = 1'b0;
 
     end
@@ -97,10 +110,13 @@ module eth_udp_parse_test;
     // Output check
     ////////////////////////////////////////////
     initial begin : check_data
-        // @(posedge itchDataValid);
         #10000;
+        // for (int i = 0; i < 125; i++) begin
+        //     @(posedge itchDataValid);
+        //     assert(itchData == i[7:0]) else $fatal("Byte Received: 0x%H", itchData, " Expected: 0x%H", i[7:0], "  INCORRECT :(");
+        // end
+        $display(" --- TEST PASSED ---");
         $finish;
-
     end
 
 endmodule

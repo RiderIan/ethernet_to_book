@@ -1,7 +1,10 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Dev: Ian Rider
-// Purpose: Generate local clocks with 100Mhz board clock and 125Mhz PHY rxClk
+// Purpose: Transfer bytes from MAC domain (125Mhz) to unrelated 250Mhz domain.
+//          Includes both tranditional async FIFO method as well as lower latency
+//          grey-code tagged method. The latter is potentially novel and has not
+//          been thoroughly verified. 
 //////////////////////////////////////////////////////////////////////////////////
 
 module slow_fast_cdc # (

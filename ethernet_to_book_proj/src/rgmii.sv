@@ -1,10 +1,9 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Ian Rider
-// 
+// Dev: Ian Rider
+// Purpose: RGMII MAC top level
 //////////////////////////////////////////////////////////////////////////////////
 `include "rgmii_rx.sv"
-`include "rgmii_tx.sv"
 
 module rgmii (
     input  logic       intBIn,
@@ -24,13 +23,9 @@ module rgmii (
     output logic [3:0] txDataOut,
     output logic       txCtrlOut);
 
-    // TX
-    // rgmii_tx tx_inst (
-    //     .rstIn(rstIn),
-    //     .clk125In(clk125In),
-    //     .intBIn(intBIn),
-    //     .txDataOut(txDataOut),
-    //     .txCtrlOut(txCtrlOut));
+    // TX side not implemented
+    assign txCtrlOut = 1'b0;
+    assign txDataOut = 8'h00;
 
     // RX
     rgmii_rx rx_inst (

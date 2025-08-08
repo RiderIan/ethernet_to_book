@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Ian Rider
-// 
+// Dev: Ian Rider
+// Purpose: RX side RGMII MAC
 //////////////////////////////////////////////////////////////////////////////////
 
 module rgmii_rx (
@@ -55,8 +55,8 @@ module rgmii_rx (
     genvar i;
     generate for (i = 0; i < 4; i++) begin
         IDDR rx_data_iddr_inst (
-            .Q1(dataRising[i]),   // rising edge capture
-            .Q2(dataFalling[i]),  // falling edge capture
+            .Q1(dataRising[i]),    // rising edge capture
+            .Q2(dataFalling[i]),   // falling edge capture
             .C(rxClkIn),           // rx clk (1.5ns delay already induced)
             .CE(mmcmLockedIn),     // indicates delayed clock is stable
             .D(rxDataIn[i]),       // data from PHY

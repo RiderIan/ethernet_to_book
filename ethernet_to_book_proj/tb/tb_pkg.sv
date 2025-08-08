@@ -1,47 +1,12 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Dev: Ian Rider
-// Purpose: Re-use test bench interface, tasks, and functions 
+// Purpose: Testbench only tasks, functions, etc
 //////////////////////////////////////////////////////////////////////////////////
 `include "tb_interfaces.sv"
 
 package tb_pkg;
-
-    ////////////////////////////////////////////
-    // Structs common between src and tb
-    ////////////////////////////////////////////
-    typedef struct packed {
-        logic [47:0] dstMac;
-        logic [47:0] srcMac;
-        logic [15:0] ethType;
-    } ethHeaderType;
-
-    typedef struct packed {
-        logic [ 7:0] ver;
-        logic [ 7:0] dscpEcn;
-        logic [15:0] len;
-        logic [15:0] id;
-        logic [15:0] flags;
-        logic [ 7:0] ttl;
-        logic [ 7:0] protocol;
-        logic [15:0] chkSum;
-        logic [31:0] srcIp;
-        logic [31:0] dstIp;
-    } ipHeaderType;
-
-    typedef struct packed {
-        logic [15:0] srcPort;
-        logic [15:0] dstPort;
-        logic [15:0] udpLen;
-        logic [15:0] chkSum;
-    } udpHeaderType;
-
-    typedef struct packed {
-        logic [79:0] sessId;
-        logic [63:0] seqNum;
-        logic [15:0] msgCnt;
-        logic [15:0] moldLen;
-    } moldHeaderType;
+    import pkg::*;
 
     ////////////////////////////////////////////
     // Tasks - TB ONLY
@@ -135,16 +100,16 @@ package tb_pkg;
         input udpHeaderType udpHeader);
 
         begin
-            $display("--- SENDING IP HEADER ---");
+            $display("--- SENDING UDP HEADER ---");
             $display("Source port:      0x%H",   udpHeader.srcPort);
             $display("Destination port: 0x%H",   udpHeader.dstPort);
-            $display("Udp length:       0x%H",   udpHeader.udpLen);
+            $display("Udp length:       0x%H",   udpHeader.len);
             $display("Check sum:        0x%H",   udpHeader.chkSum);
             for (int i = 0; i < 8; i++) begin
                 send_eth_udp_byte(parserIf, udpHeader.srcPort[15:8]);
                 udpHeader = udpHeader << 8;
             end
-            $display("--- DONE SENDING IP HEADER ---");
+            $display("--- DONE SENDING UDP HEADER ---");
         end
     endtask
 
@@ -153,30 +118,42 @@ package tb_pkg;
         input moldHeaderType moldHeader);
 
         begin
-            $display("--- SENDING IP HEADER ---");
+            $display("--- SENDING MOLD HEADER ---");
             $display("Session ID:      0x%H",   moldHeader.sessId);
             $display("Sequence number: 0x%H",   moldHeader.seqNum);
             $display("Message count:   0x%H",   moldHeader.msgCnt);
             $display("Mold length:     0x%H",   moldHeader.moldLen);
-            for (int i = 0; i < 20; i++) begin
+            for (int i = 0; i < 22; i++) begin
                 send_eth_udp_byte(parserIf, moldHeader.sessId[79:72]);
                 moldHeader = moldHeader << 8;
             end
-            $display("--- DONE SENDING IP HEADER ---");
+            $display("--- DONE SENDING MOLD HEADER ---");
         end
     endtask
 
-    // task send_ip_header (
-    //     virtual eth_udp_if parserIf,
-    //     input logic [ 7:0] verIhl, dscpEcn,
-    //     input logic [15:0] len,
-    //     input logic [15:0] id,
-    //     input logic [15:0] flags,
-    //     input logic [ 7:0] ttl,
-    //     input logic [ 7:0] protocol,
-    //     input logic [15:0] chksum,
-    // );
-    // endtask
+    task send_itch_data (
+        virtual eth_udp_if parserIf,
+        input itchAddOrderType itchData);
+
+        begin
+            $display("--- SENDING ITCH DATA ---");
+            $display("Message type:           0x%H", itchData.msgType);
+            $display("Stock locate:           0x%H", itchData.locate);
+            $display("Tracking number:        0x%H", itchData.trackNum);
+            $display("Timestamp:              0x%H", itchData.timeStamp);
+            $display("Order reference number: 0x%H", itchData.refNum);
+            $display("Buy/sell indicator:     0x%H", itchData.buySell);
+            $display("Shares:                 0x%H", itchData.shares);
+            $display("Stock:                  0x%H", itchData.stock);
+            $display("Price:                  0x%H", itchData.price);
+
+            for (int i = 0; i < 36; i++) begin
+                send_eth_udp_byte(parserIf, itchData.msgType);
+                itchData = itchData << 8;
+            end
+            $display("--- DONE SENDING ITCH DATA ---");
+        end
+    endtask;
 
     task check_eth_udp_byte (
         virtual eth_udp_output_if parserOutIf,
