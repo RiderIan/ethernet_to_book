@@ -7,66 +7,48 @@ import tb_pkg::*;
 
 module eth_udp_parse_test;
 
-    const int CLK_250_MHZ_PERIOD = 4;
+    const int         CLK_250_MHZ_PERIOD = 4;
 
-    const int ETH_HEADER_LEN     = 14; // Not included in IP length
-    const int IP_HEADER_LEN      = 20;
-    const int UDP_HEADER_LEN     = 8;
-    const int MOLD_HEADER_LEN    = 20;
-    const int ITCH_DATA_LEN      = 125;
-    const int IP_V4_TOTAL_LEN    = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN + IP_HEADER_LEN;
-    const int UDP_LENGTH         = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN;
+    const int         ETH_HEADER_LEN     = 14; // Not included in IP length
+    const int         IP_HEADER_LEN      = 20;
+    const int         UDP_HEADER_LEN     = 8;
+    const int         MOLD_HEADER_LEN    = 20;
 
-    // Ethernet header
-    const logic [47:0] SRC_MAC           = 48'h123456789ABC; // Random
-    const logic [47:0] DEVICE_MAC        = 48'hA846D2197E2B; // Arbitrary, not going to read actual MAC from ROM
-    const logic [15:0] ETH_TYPE          = 16'h0800;         // IpV4
-    ethHeaderType ethHdr = {SRC_MAC, DEVICE_MAC, ETH_TYPE};
-
-    // IP Header
-    const logic [ 7:0] VER         =  8'h45;                 // IpV4
-    const logic [ 7:0] DSCP_ECN    =  8'h00;                 // Not used
-    const logic [15:0] LEN         = IP_V4_TOTAL_LEN[15:0];  // Entire packet length
-    const logic [15:0] ID          = 16'h0000;               // Not used for now
-    const logic [15:0] FLAGS       = 16'h0000;               // Not used
-    const logic [ 7:0] TTL         =  8'h00;                 // Not used
-    const logic [ 7:0] PROTOCOL    =  8'h11;                 // UDP
-    logic       [15:0] ipChkSum    = 16'h0000;               // Checksum over entire header with chksum set to zero
-    const logic [31:0] SRC_IP      = 32'h12345678;           // random for now
-    const logic [31:0] DST_IP      = 32'hE0000000;           // Multicast
-    ipHeaderType ipHdr = {VER, DSCP_ECN, LEN, ID, FLAGS, TTL, PROTOCOL, ipChkSum, SRC_IP, DST_IP};
-
-    // UDP Header
-    const logic [15:0] SRC_PORT    = 16'h1426;               // Random
-    const logic [15:0] DST_PORT    = 16'h0001;               // Only one port
-    const logic [15:0] UDP_LEN     = UDP_LENGTH[15:0];       // UDP header and data
-    logic       [15:0] udpChkSum   = 16'h0000;               // Not implemented yet
-    udpHeaderType udpHdr = {SRC_PORT, DST_PORT, UDP_LEN, udpChkSum};
-
-    // Mold Header
-    logic [79:0] sessionId = 80'hABCDE54321FFEECBE418;       // Random
-    logic [63:0] seqNum    = 64'h0000000000000000;           // Increments for every new message on session ID
-    logic [15:0] msgCnt    = 16'h0001;                       // Number of ITCH messages within frame
-    logic [15:0] moldLen   = ITCH_DATA_LEN[15:0];            // Number of data bytes
-    moldHeaderType moldHdr = {sessionId, seqNum, msgCnt, moldLen};
+    logic             rst, clk250, dataErr, dataValid;
+    eth_udp_if        parserIf(clk250);
+    eth_udp_output_if parserOutIf(clk250);
 
     // ITCH Data
-    // itchDataType itchData;
-    // itchData.msgType    =;
-    // itchData.locate     =;
-    // itchData.trackNum   =;
-    // itchData.timeStamp  =;
-    // itchData.refNum     =;
-    // itchData.buySell    =;
-    // itchData.shares     =;
-    // itchData.stock      =;
-    // itchData.price      =;
+    itchAddOrderType itchOrder = '{
+        msgType    : ADD_MSG_TYPE,
+        locate     : 16'hBE42,      // Changes everyday, used for rapid book lookup
+        trackNum   : 16'h0001,
+        timeStamp  : 48'h000000000000,
+        refNum     : 64'hDEFB1673DEFB1673,
+        buySell    : BUY,
+        shares     : 32'h00000045,
+        stock      : AAPL,
+        price      : 32'h0022FEFC}; // Price in $0.0001 increments, this is $229.3500 for example
 
+    int ITCH_DATA_LEN      = $bits(itchOrder)/8;
+    int IP_V4_TOTAL_LEN    = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN + IP_HEADER_LEN;
+    int UDP_LENGTH         = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN;
 
+    // Ethernet header
+    ethHeaderType ethHdr = {DEVICE_MAC, SRC_MAC, ETH_IP_V4_TYPE};
 
-    logic [7:0] itchData;
-    logic       rst, clk250, dataErr, dataValid, itchDataValid;
-    eth_udp_if  parserIf(clk250);
+    // IP Header
+    ipHeaderType ipHdr = {IP_V4_TYPE, DSCP_ECN, IP_V4_TOTAL_LEN[15:0], ID, FLAGS, TTL, PROTOCOL, 16'h0000, SRC_IP, NYSE_DST_IP};
+
+    // UDP Header
+    udpHeaderType udpHdr = {NYSE_UDP_SRC_PORT, UDP_DEST_PORT, UDP_LENGTH[15:0], 16'h0000};
+
+    // Mold Header
+    moldHeaderType moldHdr = '{
+        sessId    : 80'hABCDE54321FFEECBE418, // Random
+        seqNum    : 64'h0000000000000000,     // Increments for every new message on session ID
+        msgCnt    : 16'h0001,                 // Number of ITCH messages within frame
+        moldLen   : ITCH_DATA_LEN[15:0]};     // Number of data bytes
 
     ////////////////////////////////////////////
     // Clock gen
@@ -82,8 +64,8 @@ module eth_udp_parse_test;
         .dataIn(parserIf.data),
         .dataValidIn(parserIf.dataValid),
         .dataErrIn(parserIf.dataErr),
-        .itchDataOut(itchData),
-        .itchDataValidOut(itchDataValid));
+        .itchDataOut(parserOutIf.data),
+        .itchDataValidOut(parserOutIf.dataValid));
 
     ////////////////////////////////////////////
     // Stimulus
@@ -97,12 +79,34 @@ module eth_udp_parse_test;
 
         // Send ethernet frame header
         send_eth_header(parserIf, ethHdr);
-        send_ip_header(parserIf,  ipHdr);
+        send_ip_header(parserIf, ipHdr);
         send_udp_header(parserIf, udpHdr);
         send_mold_header(parserIf, moldHdr);
-       
+        // Send an add order
+        send_itch_order(parserIf, itchOrder);
         @(posedge parserIf.clk);
         parserIf.dataValid = 1'b0;
+
+        #10000;
+        
+        itchOrder = '{
+        msgType    : ADD_MSG_TYPE,
+        locate     : 16'hBE42,
+        trackNum   : 16'h0005,
+        timeStamp  : 48'h000000000123,
+        refNum     : 64'h111B1673DEFB4321,
+        buySell    : SELL,
+        shares     : 32'h00000184,
+        stock      : AAPL,
+        price      : 32'h0021FEFC};
+
+        // Send ethernet frame header
+        send_eth_header(parserIf, ethHdr);
+        send_ip_header(parserIf, ipHdr);
+        send_udp_header(parserIf, udpHdr);
+        send_mold_header(parserIf, moldHdr);
+        // Send an add order
+        send_itch_order(parserIf, itchOrder);
 
     end
 
@@ -110,11 +114,23 @@ module eth_udp_parse_test;
     // Output check
     ////////////////////////////////////////////
     initial begin : check_data
-        #10000;
-        // for (int i = 0; i < 125; i++) begin
-        //     @(posedge itchDataValid);
-        //     assert(itchData == i[7:0]) else $fatal("Byte Received: 0x%H", itchData, " Expected: 0x%H", i[7:0], "  INCORRECT :(");
-        // end
+
+        @(posedge parserOutIf.dataValid);
+        for (int i = 0; i < ($bits(itchOrder)/8); i++) begin
+            check_eth_udp_byte(parserOutIf, itchOrder.msgType);
+            itchOrder = itchOrder << 8;
+        end
+
+        @(posedge parserOutIf.clk);
+        assert(parserOutIf.dataValid == 1'b0) else $fatal ("Valid failed to de-assert :(");
+
+        @(posedge parserOutIf.dataValid);
+        for (int i = 0; i < ($bits(itchOrder)/8); i++) begin
+            check_eth_udp_byte(parserOutIf, itchOrder.msgType);
+            itchOrder = itchOrder << 8;
+        end
+
+        #20;
         $display(" --- TEST PASSED ---");
         $finish;
     end

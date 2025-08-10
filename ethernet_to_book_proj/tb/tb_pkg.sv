@@ -67,7 +67,6 @@ package tb_pkg;
                 send_eth_udp_byte(parserIf, ethHeader.dstMac[47:40]);
                 ethHeader = ethHeader << 8;
             end
-            $display("--- DONE SENDING ETHERNET HEADER ---");
         end
     endtask
 
@@ -91,7 +90,6 @@ package tb_pkg;
                 send_eth_udp_byte(parserIf, ipHeader.ver);
                 ipHeader = ipHeader << 8;
             end
-            $display("--- DONE SENDING IP HEADER ---");
         end
     endtask
 
@@ -109,7 +107,6 @@ package tb_pkg;
                 send_eth_udp_byte(parserIf, udpHeader.srcPort[15:8]);
                 udpHeader = udpHeader << 8;
             end
-            $display("--- DONE SENDING UDP HEADER ---");
         end
     endtask
 
@@ -127,16 +124,15 @@ package tb_pkg;
                 send_eth_udp_byte(parserIf, moldHeader.sessId[79:72]);
                 moldHeader = moldHeader << 8;
             end
-            $display("--- DONE SENDING MOLD HEADER ---");
         end
     endtask
 
-    task send_itch_data (
+    task send_itch_order (
         virtual eth_udp_if parserIf,
         input itchAddOrderType itchData);
 
         begin
-            $display("--- SENDING ITCH DATA ---");
+            $display("--- SENDING ITCH ORDER ---");
             $display("Message type:           0x%H", itchData.msgType);
             $display("Stock locate:           0x%H", itchData.locate);
             $display("Tracking number:        0x%H", itchData.trackNum);
@@ -151,7 +147,6 @@ package tb_pkg;
                 send_eth_udp_byte(parserIf, itchData.msgType);
                 itchData = itchData << 8;
             end
-            $display("--- DONE SENDING ITCH DATA ---");
         end
     endtask;
 
@@ -161,9 +156,10 @@ package tb_pkg;
 
         begin
             @(posedge parserOutIf.clk);
-            if (parserOutIf.dataValid == 1'b1)
-                assert(parserOutIf.data == expectedDataByte) else $fatal("Byte Received: 0x%H", parserOutIf.data, " Expected: 0x%H", expectedDataByte, "  INCORRECT :(");
-            $display("Byte Received: 0x%H", parserOutIf.data, " Expected: 0x%H", expectedDataByte, "  CORRECT :)");
+            if (parserOutIf.dataValid == 1'b1) begin
+                assert(parserOutIf.data == expectedDataByte) else $fatal("Byte Received: 0x%H Expected: 0x%H   INCORRECT :(", parserOutIf.data, expectedDataByte);
+                $display("Byte Received: 0x%H", parserOutIf.data, " Expected: 0x%H", expectedDataByte, "  CORRECT :)");
+            end
         end
     endtask
 
@@ -173,9 +169,10 @@ package tb_pkg;
 
         begin
             @(posedge rxIf.rxClkLcl);
-            if (rxIf.rxDataValid == 1'b1)
+            if (rxIf.rxDataValid == 1'b1) begin
                 assert(rxIf.rxData == expectedDataByte) else $fatal("Byte Received: 0x%H", rxIf.rxData, " Expected: 0x%H", expectedDataByte, "  INCORRECT :(");
-            $display("Byte Received: 0x%H", rxIf.rxData, " Expected: 0x%H", expectedDataByte, "  CORRECT :)");
+                $display("Byte Received: 0x%H", rxIf.rxData, " Expected: 0x%H", expectedDataByte, "  CORRECT :)");
+            end
         end
     endtask
 endpackage

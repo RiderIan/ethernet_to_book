@@ -19,27 +19,20 @@ module eth_udp_parser (
     output logic [7:0] itchDataOut);
 
     // Header byte offsets
-    const logic [10:0] ETH_HDR_DONE      = 11'd14;
-    const logic [10:0] IP_HDR_DONE       = 11'd34;
-    const logic [10:0] UDP_HDR_DONE      = 11'd42;
-    const logic [10:0] MOLD_HDR_DONE     = 11'd64;
+    const logic [10:0] ETH_HDR_DONE  = 11'd14;
+    const logic [10:0] IP_HDR_DONE   = 11'd34;
+    const logic [10:0] UDP_HDR_DONE  = 11'd42;
+    const logic [10:0] MOLD_HDR_DONE = 11'd64;
 
-    const logic [47:0] DEVICE_MAC        = 48'hA846D2197E2B; // Arbitrary for now
-    const logic [15:0] IP_V4_TYPE        = 16'h0800;         // IpV4
-    const logic [31:0] NYSE_DST_IP       = 32'hE0000000;     // NYSE integrated feed multicast dest
-    const logic [ 7:0] IP_VER            =  8'h45;           // IpV4
-    const logic [ 7:0] PROTOCOL          =  8'h11;           // UDP
-    const logic [15:0] NYSE_UDP_SRC_PORT = 16'h3E80;       
-    const logic [15:0] UDP_DEST_PORT     = 16'h2710;
-
-    logic [10:0] byteCntR, payloadStartCntR;
-    logic dstMacCheckR, ipV4CheckR;
+    logic [10:0] byteCntR;
+    logic dstMacCheckR, ipV4CheckR, ipV6CheckR;
     logic ipVerCheckR, protocolCheckR, nyseIpCheckR;
     logic udpSrcCheckR, udpDstCheckR, passItchR;
     logic moldSeqValidR;
-    logic endOfFrameDetR;
+    logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR;
 
-    (* shreg_extract = "no" *) logic [15:0] udpLenR, udpLenRR, udpLenRRR;
+    (* shreg_extract = "no" *) logic [15:0] udpLenR, udpLenRR, udpLenRRR, ipV6LenR, ipV6LenRR, ipV6LenRRR;
+    (* shreg_extract = "no" *) logic [15:0] sessIdR, sessIdRR, sessIdRRR, seqNumR, seqNumRR, seqNumRRR;
 
     ////////////////////////////////////////////
     // Ethernet header capture
@@ -55,16 +48,23 @@ module eth_udp_parser (
         if (rstIn) begin
             dstMacCheckR <= 1'b0;
             ipV4CheckR   <= 1'b0;
+            ipV6CheckR   <= 1'b0;
         end else begin
             if (byteCntR == (ETH_HDR_DONE + 1)) begin
                 if (ethHeaderR.dstMac == DEVICE_MAC)
                     dstMacCheckR <= 1'b1;
                 
-                if (ethHeaderR.ethType == IP_V4_TYPE)
+                if (ethHeaderR.ethType == ETH_IP_V4_TYPE)
                     ipV4CheckR <= 1'b1;
+
+                // Frame igored if IPv6 but end of frame still needs to be detected
+                if (ethHeaderR.ethType == ETH_IP_V6_TYPE)
+                    ipV6CheckR <= 1'b1;
+
             end else if (endOfFrameDetR) begin
                 dstMacCheckR <= 1'b0;
                 ipV4CheckR   <= 1'b0;
+                ipV6CheckR   <= 1'b0;
             end
         end
     end
@@ -87,7 +87,7 @@ module eth_udp_parser (
             protocolCheckR <= 1'b0;
         end else begin
             if (byteCntR == (IP_HDR_DONE + 1)) begin
-                if (ipHeaderR.ver == IP_VER)
+                if (ipHeaderR.ver == IP_V4_TYPE)
                     ipVerCheckR    <= 1'b1;
                 if (ipHeaderR.dstIp == NYSE_DST_IP)
                     nyseIpCheckR   <= 1'b1;
@@ -98,6 +98,20 @@ module eth_udp_parser (
                 nyseIpCheckR   <= 1'b0;
                 protocolCheckR <= 1'b0;
             end
+        end
+    end
+
+    // not verified
+    // IPv6 length is at same offset of ID of IPv4
+    always_ff @(posedge clkIn) begin : ip_v6_len_pipe
+        ipV6LenR   <= ipHeaderR.id;
+        ipV6LenRR  <= ipV6LenR + ETH_HDR_DONE;
+        ipV6LenRRR <= (byteCntR > (IP_HDR_DONE + 1)) ? ipV6LenRR : '1;
+
+        if (byteCntR >= (ipV6LenRRR[10:0] - 1)) begin
+            ipV6FrameDoneR <= 1'b1;
+        end else begin
+            ipV6FrameDoneR <= 1'b0;
         end
     end
 
@@ -132,19 +146,25 @@ module eth_udp_parser (
 
     // Reduces combo logic time on EOF comparison to pass timing
     // Latency doesn't matter becuase length isn't checked until udp header is complete
-    always_ff @(posedge clkIn) begin : len_pipeline
-        udpLenR          <= udpHeaderR.len;
-        payloadStartCntR <= udpLenR;
+    always_ff @(posedge clkIn) begin : udp_len_pipe
+        udpLenR   <= udpHeaderR.len;
+        udpLenRR  <= udpLenR + IP_HDR_DONE;
+        udpLenRRR <= (byteCntR > (UDP_HDR_DONE + 1)) ? udpLenRR : '1;
+
+        if (byteCntR >= (udpLenRRR[10:0] - 1)) begin
+            ipV4FrameDoneR <= 1'b1;
+        end else begin
+            ipV4FrameDoneR <= 1'b0;
+        end
     end
 
     always_ff @(posedge clkIn) begin : end_of_frame_det
         if (rstIn) begin
             endOfFrameDetR <= 1'b0;
         end else begin
-            if (byteCntR > UDP_HDR_DONE) begin
-                if (byteCntR == payloadStartCntR) begin
-                    endOfFrameDetR <= 1'b1;
-                end
+            // Should this be XOR?
+            if ((ipV4FrameDoneR & ipV4CheckR) | (ipV6FrameDoneR & ipV6CheckR)) begin
+                endOfFrameDetR <= 1'b1;
             end else begin
                 endOfFrameDetR <= 1'b0;
             end
@@ -162,11 +182,22 @@ module eth_udp_parser (
             moldHeaderR <= (moldHeaderR << 8) | dataIn; 
     end
 
+    always_ff @(posedge clkIn) begin : sess_seq_pipe
+        sessIdR   <= moldHeaderR.sessId;
+        sessIdRR  <= sessIdR;
+        sessIdRRR <= sessIdRR;
+
+        seqNumR   <= moldHeaderR.seqNum;
+        seqNumRR  <= seqNumR;
+        seqNumRRR <= seqNumRRR;
+        
+    end
+
     always_ff @(posedge clkIn) begin : mold_header_check
         if (rstIn) begin
             moldSeqValidR <= 1'b0;
         end else begin
-            if (byteCntR == (MOLD_HDR_DONE + 1)) begin
+            if (byteCntR == (MOLD_HDR_DONE - 1)) begin
                 moldSeqValidR <= 1'b1;                    // not implemented, just stand in for first round sim
             end else if (endOfFrameDetR) begin
                 moldSeqValidR <= 1'b0;
