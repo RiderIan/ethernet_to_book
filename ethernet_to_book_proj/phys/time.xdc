@@ -12,9 +12,9 @@ create_clock -period 8  -name rx_clk_125   [get_ports rxClkIn]
 ###########################################
 # Generated clocks
 ###########################################
-create_generated_clock -name tx_clk_125     -source [get_ports clkIn]   -multiply 5      -divide_by 4                [get_pins clks_rsts_inst/mmcm0_inst/inst/mmcm_adv_inst/CLKOUT0]
+create_generated_clock -name tx_clk_125     -source [get_ports clkIn]   -multiply 5    -divide_by 4              [get_pins clks_rsts_inst/mmcm0_inst/inst/mmcm_adv_inst/CLKOUT0]
 create_generated_clock -name tx_clk_125_dly -source [get_ports clkIn]   -edges {1 2 3} -edge_shift {1.5 .5 -.5}  [get_pins clks_rsts_inst/mmcm0_inst/inst/mmcm_adv_inst/CLKOUT1]
-create_generated_clock -name clk_250        -source [get_ports clkIn]   -multiply 5      -divide_by 2                [get_pins clks_rsts_inst/mmcm0_inst/inst/mmcm_adv_inst/CLKOUT2]
+create_generated_clock -name clk_250        -source [get_ports clkIn]   -multiply 5    -divide_by 2              [get_pins clks_rsts_inst/mmcm0_inst/inst/mmcm_adv_inst/CLKOUT2]
 create_generated_clock -name rx_clk_125_dly -source [get_ports rxClkIn] -edges {1 2 3} -edge_shift {1.5 5.5 9.5} [get_pins clks_rsts_inst/mmcm1_inst/inst/mmcm_adv_inst/CLKOUT0]
 
 ###########################################

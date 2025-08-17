@@ -14,7 +14,7 @@ module ethernet_to_book_top (
     //inout  logic       mdioBi,
     //output logic       mdClkOut,
 
-    input  logic [3:0]  rxDataIn,    
+    input  logic [3:0]  rxDataIn,
     input  logic        rxCtrlIn,
     input  logic        rxClkIn,
 
@@ -26,12 +26,13 @@ module ethernet_to_book_top (
     output logic [7:0 ] itchDataOut,
 
     input  logic        intBIn,
-    output logic        phyRstBOut);
+    output logic        phyRstBOut,
+    output logic        lockedOut);
 
     // Signals
-    logic       rstTxLcl,    rstTx,       rst250, rstRxLcl;    
+    logic       rstTxLcl,    rstTx,       rst250, rstRxLcl;
     logic       txClkLcl,    rxClkLcl,    clk250;
-    logic       mmcm0Locked, mmcm1Locked; 
+    logic       mmcm0Locked, mmcm1Locked;
     logic [7:0] rxData,      rx250Data, itchData;
     logic       rxDataValid, rdDataValid, rdDataErr, itchValid;
 
@@ -52,8 +53,6 @@ module ethernet_to_book_top (
         .rxClkLclOut(rxClkLcl),
         .mmcm0LockedOut(mmcm0Locked),
         .mmcm1LockedOut(mmcm1Locked));
-
-    assign phyRstBOut = rstTx; // may want more logic driving this
 
     ////////////////////////////////////////////
     // RGMII
@@ -81,7 +80,7 @@ module ethernet_to_book_top (
     slow_fast_cdc #(
         .XPERIMENTAL_LOW_LAT_CDC(1'b1))
     slow_fast_cdc_inst (
-        .wrRstIn(rstRxLcl),        
+        .wrRstIn(rstRxLcl),
         .wrClkIn(rxClkLcl),
         .wrEnIn(rxDataValid),
         .wrDataIn(rxData),
@@ -103,10 +102,14 @@ module ethernet_to_book_top (
         .itchDataValidOut(itchValid),
         .itchDataOut(itchData));
 
+    ////////////////////////////////////////////
+    // Outputs
+    ////////////////////////////////////////////
+    assign phyRstBOut       = rstTx; // may want more logic driving this
+    assign lockedOut        = mmcm0Locked & mmcm1Locked;
+
     // Temporary to prevent synth optimization
     assign itchDataValidOut = itchValid;
     assign itchDataOut      = itchData;
-
-    
 
 endmodule

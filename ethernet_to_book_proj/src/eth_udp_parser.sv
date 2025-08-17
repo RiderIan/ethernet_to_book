@@ -14,34 +14,40 @@ module eth_udp_parser (
     input  logic [7:0] dataIn,
     input  logic       dataValidIn,
     input  logic       dataErrIn,
-   
+
     output logic       itchDataValidOut,
-    output logic [7:0] itchDataOut);
+    output logic [7:0] itchDataOut,
+    output logic       packetLostOut);
 
     // Header byte offsets
     const logic [10:0] ETH_HDR_DONE  = 11'd14;
     const logic [10:0] IP_HDR_DONE   = 11'd34;
     const logic [10:0] UDP_HDR_DONE  = 11'd42;
+    const logic [10:0] SESS_SEQ_DONE = 11'd60;
     const logic [10:0] MOLD_HDR_DONE = 11'd64;
 
     logic [10:0] byteCntR;
+    logic [ 7:0] dataR;
+    logic [16:0] ipChkSumAccumR;
     logic dstMacCheckR, ipV4CheckR, ipV6CheckR;
-    logic ipVerCheckR, protocolCheckR, nyseIpCheckR;
-    logic udpSrcCheckR, udpDstCheckR, passItchR;
-    logic moldSeqValidR;
+    logic ipVerCheckR, protocolCheckR, nyseIpCheckR, ipChkSumPassR, ipPackTwoBytesR;
+    logic udpSrcCheckR, udpDstCheckR, passItch;
+    logic moldDoneR;
     logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR;
 
-    (* shreg_extract = "no" *) logic [15:0] udpLenR, udpLenRR, udpLenRRR, ipV6LenR, ipV6LenRR, ipV6LenRRR;
+    logic [31:0] sessionIdsR[1:32];
+
+    (* shreg_extract = "no" *) logic [15:0] udpLenR, udpLenRR, udpLenRRR, ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR;
     (* shreg_extract = "no" *) logic [15:0] sessIdR, sessIdRR, sessIdRRR, seqNumR, seqNumRR, seqNumRRR;
 
     ////////////////////////////////////////////
-    // Ethernet header capture
+    // Ethernet header
     ////////////////////////////////////////////
     ethHeaderType ethHeaderR;
 
     always_ff @(posedge clkIn) begin : eth_header_capture
         if (dataValidIn & (byteCntR < ETH_HDR_DONE))
-            ethHeaderR <= (ethHeaderR << 8) | dataIn;  
+            ethHeaderR <= (ethHeaderR << 8) | dataIn;
     end
 
     always_ff @(posedge clkIn) begin : eth_header_check
@@ -53,7 +59,7 @@ module eth_udp_parser (
             if (byteCntR == (ETH_HDR_DONE + 1)) begin
                 if (ethHeaderR.dstMac == DEVICE_MAC)
                     dstMacCheckR <= 1'b1;
-                
+
                 if (ethHeaderR.ethType == ETH_IP_V4_TYPE)
                     ipV4CheckR <= 1'b1;
 
@@ -70,14 +76,35 @@ module eth_udp_parser (
     end
 
     ////////////////////////////////////////////
-    // IPv4 header capture
+    // IPv4 header
     ////////////////////////////////////////////
     // TODO: Check IP checksum?
     ipHeaderType ipHeaderR;
 
     always_ff @(posedge clkIn) begin : ip_header_capture
-        if (dataValidIn & (byteCntR < IP_HDR_DONE))
-            ipHeaderR <= (ipHeaderR << 8) | dataIn;  
+        if (rstIn) begin
+            ipHeaderR       <= '0;
+            ipPackTwoBytesR <= '0;
+            ipChkSumAccumR  <= '0;
+            onesCompSumR    <= '0;
+            dataR           <= '0;
+        end else begin
+            // Capture
+            if (dataValidIn & (byteCntR < IP_HDR_DONE)) begin
+                ipHeaderR       <= (ipHeaderR << 8) | dataIn;
+                dataR           <= dataIn;
+                ipPackTwoBytesR <= ~ipPackTwoBytesR;
+            end
+
+            // Checksum
+            if (ipPackTwoBytesR & (byteCntR < IP_HDR_DONE) & (byteCntR >= ETH_HDR_DONE)) begin
+                ipChkSumAccumR <= ipChkSumAccumR + {dataR, dataIn};
+                onesCompSumR   <= ~(ipChkSumAccumR[15:0] + ipChkSumAccumR[16]);
+            end else if (endOfFrameDetR) begin
+                ipChkSumAccumR <= '0;
+                onesCompSumR   <= '0;
+            end
+        end
     end
 
     always_ff @(posedge clkIn) begin : ip_header_check
@@ -85,6 +112,7 @@ module eth_udp_parser (
             ipVerCheckR    <= 1'b0;
             nyseIpCheckR   <= 1'b0;
             protocolCheckR <= 1'b0;
+            ipChkSumPassR  <= 1'b0;
         end else begin
             if (byteCntR == (IP_HDR_DONE + 1)) begin
                 if (ipHeaderR.ver == IP_V4_TYPE)
@@ -93,37 +121,27 @@ module eth_udp_parser (
                     nyseIpCheckR   <= 1'b1;
                 if (ipHeaderR.protocol == PROTOCOL)
                     protocolCheckR <= 1'b1;
+                if (onesCompSumR == 17'h00)
+                    ipChkSumPassR  <= 1'b1;
+
             end else if (endOfFrameDetR) begin
                 ipVerCheckR    <= 1'b0;
                 nyseIpCheckR   <= 1'b0;
                 protocolCheckR <= 1'b0;
+                ipChkSumPassR  <= 1'b0;
             end
         end
     end
 
-    // not verified
-    // IPv6 length is at same offset of ID of IPv4
-    always_ff @(posedge clkIn) begin : ip_v6_len_pipe
-        ipV6LenR   <= ipHeaderR.id;
-        ipV6LenRR  <= ipV6LenR + ETH_HDR_DONE;
-        ipV6LenRRR <= (byteCntR > (IP_HDR_DONE + 1)) ? ipV6LenRR : '1;
-
-        if (byteCntR >= (ipV6LenRRR[10:0] - 1)) begin
-            ipV6FrameDoneR <= 1'b1;
-        end else begin
-            ipV6FrameDoneR <= 1'b0;
-        end
-    end
-
     ////////////////////////////////////////////
-    // UDP header capture
+    // UDP header
     ////////////////////////////////////////////
     // TODO: UDP checksum?
     udpHeaderType udpHeaderR;
 
     always_ff @(posedge clkIn) begin : udp_header_capture
         if (dataValidIn & (byteCntR < UDP_HDR_DONE))
-            udpHeaderR <= (udpHeaderR << 8) | dataIn; 
+            udpHeaderR <= (udpHeaderR << 8) | dataIn;
     end
 
     always_ff @(posedge clkIn) begin : udp_header_check
@@ -134,13 +152,86 @@ module eth_udp_parser (
             if (byteCntR == (UDP_HDR_DONE + 1)) begin
                 if (udpHeaderR.srcPort == NYSE_UDP_SRC_PORT)
                     udpSrcCheckR <= 1'b1;
-                
+
                 if (udpHeaderR.dstPort == UDP_DEST_PORT)
                     udpDstCheckR <= 1'b1;
             end else if (endOfFrameDetR) begin
                 udpSrcCheckR <= 1'b0;
                 udpDstCheckR <= 1'b0;
             end
+        end
+    end
+
+    ////////////////////////////////////////////
+    // MoldUDP64 header
+    ////////////////////////////////////////////
+    // TODO: implement sessionID/sequence number checker
+    moldHeaderType moldHeaderR;
+    logic [143:0] sessSeqR;
+
+    always_ff @(posedge clkIn) begin : mold_header_capture
+        if (dataValidIn & (byteCntR < MOLD_HDR_DONE))
+            moldHeaderR <= (moldHeaderR << 8) | dataIn;
+    end
+
+    // Need to be able to check sessId/seqNum before end of moldHeader to not induce any extra latency
+    always_ff @(posedge clkIn) begin : sess_id_seq_num_capture
+        if (dataValidIn & (byteCntR < SESS_SEQ_DONE))
+            sessSeqR <= (sessSeqR << 8) | dataIn;
+    end
+
+    // always_ff @(posedge clkIn) begin : sess_seq_pipe
+    //     sessIdR   <= moldHeaderR.sessId;
+    //     sessIdRR  <= sessIdR;
+    //     sessIdRRR <= sessIdRR;
+//
+    //     seqNumR   <= moldHeaderR.seqNum;
+    //     seqNumRR  <= seqNumR;
+    //     seqNumRRR <= seqNumRRR;
+//
+    // end
+
+    always_ff @(posedge clkIn) begin : mold_header_check
+        if (rstIn) begin
+            packetLostOut <= 1'b0;
+        end else begin
+            packetLostOut <= 1'b0;
+            if (byteCntR == (SESS_SEQ_DONE + 1)) begin
+                sessionIdsR[sessSeqR[143:64]] <= sessSeqR[63:0];
+
+                if (sessSeqR[63:0] != sessionIdsR[sessSeqR[143:64]])
+                    packetLostOut <= 1'b1;
+            end
+        end
+    end
+
+    always_ff @(posedge clkIn) begin : mold_end_detect
+        if (rstIn) begin
+            moldDoneR <= 1'b0;
+        end else begin
+            if (byteCntR == (MOLD_HDR_DONE - 1)) begin
+                moldDoneR <= 1'b1;
+            end else if (endOfFrameDetR) begin
+                moldDoneR <= 1'b0;
+            end
+        end
+    end
+
+    ////////////////////////////////////////////
+    // End of frame detection
+    ////////////////////////////////////////////
+
+    // not verified
+    // Handles end of frame detection incase of IPv6
+    always_ff @(posedge clkIn) begin : ip_v6_len_pipe
+        ipV6LenR   <= ipHeaderR.id;
+        ipV6LenRR  <= ipV6LenR + ETH_HDR_DONE;
+        ipV6LenRRR <= (byteCntR > (IP_HDR_DONE + 1)) ? ipV6LenRR : '1;
+
+        if (byteCntR >= (ipV6LenRRR[10:0] - 1)) begin
+            ipV6FrameDoneR <= 1'b1;
+        end else begin
+            ipV6FrameDoneR <= 1'b0;
         end
     end
 
@@ -172,45 +263,14 @@ module eth_udp_parser (
     end
 
     ////////////////////////////////////////////
-    // MoldUDP64 header capture
-    ////////////////////////////////////////////
-    // TODO: implement sessionID/sequence number checker
-    moldHeaderType moldHeaderR;
-
-    always_ff @(posedge clkIn) begin : mold_header_capture
-        if (dataValidIn & (byteCntR < MOLD_HDR_DONE))
-            moldHeaderR <= (moldHeaderR << 8) | dataIn; 
-    end
-
-    always_ff @(posedge clkIn) begin : sess_seq_pipe
-        sessIdR   <= moldHeaderR.sessId;
-        sessIdRR  <= sessIdR;
-        sessIdRRR <= sessIdRR;
-
-        seqNumR   <= moldHeaderR.seqNum;
-        seqNumRR  <= seqNumR;
-        seqNumRRR <= seqNumRRR;
-        
-    end
-
-    always_ff @(posedge clkIn) begin : mold_header_check
-        if (rstIn) begin
-            moldSeqValidR <= 1'b0;
-        end else begin
-            if (byteCntR == (MOLD_HDR_DONE - 1)) begin
-                moldSeqValidR <= 1'b1;                    // not implemented, just stand in for first round sim
-            end else if (endOfFrameDetR) begin
-                moldSeqValidR <= 1'b0;
-            end
-        end
-    end
-
-    ////////////////////////////////////////////
     // ITCH passthrough control
     ////////////////////////////////////////////
-    assign passItchR        = dstMacCheckR & ipV4CheckR & protocolCheckR & udpSrcCheckR & udpDstCheckR & moldSeqValidR;
+    assign passItch        =  dstMacCheckR & ipV4CheckR   & protocolCheckR &
+                              udpSrcCheckR & udpDstCheckR & ipVerCheckR    &
+                              moldDoneR    & nyseIpCheckR & ipChkSumPassR;
+
     assign itchDataOut      = dataIn;
-    assign itchDataValidOut = (dataValidIn & passItchR);
+    assign itchDataValidOut = (dataValidIn & passItch);
 
     ////////////////////////////////////////////
     // Byte cnt of current frame

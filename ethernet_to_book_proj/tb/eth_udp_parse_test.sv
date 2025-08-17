@@ -39,14 +39,15 @@ module eth_udp_parse_test;
 
     // IP Header
     ipHeaderType ipHdr = {IP_V4_TYPE, DSCP_ECN, IP_V4_TOTAL_LEN[15:0], ID, FLAGS, TTL, PROTOCOL, 16'h0000, SRC_IP, NYSE_DST_IP};
+    logic [15:0] ipChkSum;
 
     // UDP Header
     udpHeaderType udpHdr = {NYSE_UDP_SRC_PORT, UDP_DEST_PORT, UDP_LENGTH[15:0], 16'h0000};
 
     // Mold Header
     moldHeaderType moldHdr = '{
-        sessId    : 80'hABCDE54321FFEECBE418, // Random
-        seqNum    : 64'h0000000000000000,     // Increments for every new message on session ID
+        sessId    : 80'h00000000000000000004, // Random
+        seqNum    : 64'h0000000000000001,     // Increments for every new message on session ID
         msgCnt    : 16'h0001,                 // Number of ITCH messages within frame
         moldLen   : ITCH_DATA_LEN[15:0]};     // Number of data bytes
 
@@ -74,6 +75,8 @@ module eth_udp_parse_test;
         rst    = 1'b1;
         clk250 = 1'b0;
         parserIf.reset();
+        ipChkSum = ip_header_chksum_calc(ipHdr);
+        ipHdr.chkSum = ipChkSum;
         #20;
         rst    = 1'b0;
 
@@ -88,7 +91,10 @@ module eth_udp_parse_test;
         parserIf.dataValid = 1'b0;
 
         #10000;
-        
+
+        // Skip one seq number for packet loss detection
+        moldHdr.seqNum = 3;
+
         itchOrder = '{
         msgType    : ADD_MSG_TYPE,
         locate     : 16'hBE42,
