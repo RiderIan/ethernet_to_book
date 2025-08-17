@@ -30,7 +30,7 @@ module eth_udp_parser (
     logic [ 7:0] dataR;
     logic [16:0] ipChkSumAccumR;
     logic dstMacCheckR, ipV4CheckR, ipV6CheckR;
-    logic ipVerCheckR, protocolCheckR, nyseIpCheckR, ipChkSumPassR, ipPackTwoBytesR;
+    logic ipVerCheckR, protocolCheckR, nyseIpCheckR, ipChkSumPassR, ipPackTwoBytesR, ipTogglePulseR;
     logic udpSrcCheckR, udpDstCheckR, passItch;
     logic moldDoneR;
     logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR;
@@ -78,22 +78,27 @@ module eth_udp_parser (
     ////////////////////////////////////////////
     // IPv4 header
     ////////////////////////////////////////////
-    // TODO: Check IP checksum?
     ipHeaderType ipHeaderR;
 
     always_ff @(posedge clkIn) begin : ip_header_capture
         if (rstIn) begin
             ipHeaderR       <= '0;
             ipPackTwoBytesR <= '0;
+            ipTogglePulseR  <= '0;
             ipChkSumAccumR  <= '0;
             onesCompSumR    <= '0;
             dataR           <= '0;
         end else begin
             // Capture
+            ipPackTwoBytesR <= 1'b0;
             if (dataValidIn & (byteCntR < IP_HDR_DONE)) begin
                 ipHeaderR       <= (ipHeaderR << 8) | dataIn;
                 dataR           <= dataIn;
-                ipPackTwoBytesR <= ~ipPackTwoBytesR;
+                ipTogglePulseR  <= ~ipTogglePulseR;
+                if (ipTogglePulseR)
+                    ipPackTwoBytesR <= 1'b1;
+            end else if (endOfFrameDetR) begin
+                dataR           <= '0;
             end
 
             // Checksum
@@ -209,7 +214,7 @@ module eth_udp_parser (
         if (rstIn) begin
             moldDoneR <= 1'b0;
         end else begin
-            if (byteCntR == (MOLD_HDR_DONE - 1)) begin
+            if (byteCntR == (MOLD_HDR_DONE)) begin
                 moldDoneR <= 1'b1;
             end else if (endOfFrameDetR) begin
                 moldDoneR <= 1'b0;
@@ -228,7 +233,7 @@ module eth_udp_parser (
         ipV6LenRR  <= ipV6LenR + ETH_HDR_DONE;
         ipV6LenRRR <= (byteCntR > (IP_HDR_DONE + 1)) ? ipV6LenRR : '1;
 
-        if (byteCntR >= (ipV6LenRRR[10:0] - 1)) begin
+        if (byteCntR >= ipV6LenRRR[10:0]) begin
             ipV6FrameDoneR <= 1'b1;
         end else begin
             ipV6FrameDoneR <= 1'b0;
@@ -242,7 +247,7 @@ module eth_udp_parser (
         udpLenRR  <= udpLenR + IP_HDR_DONE;
         udpLenRRR <= (byteCntR > (UDP_HDR_DONE + 1)) ? udpLenRR : '1;
 
-        if (byteCntR >= (udpLenRRR[10:0] - 1)) begin
+        if (byteCntR > udpLenRRR[10:0]) begin
             ipV4FrameDoneR <= 1'b1;
         end else begin
             ipV4FrameDoneR <= 1'b0;

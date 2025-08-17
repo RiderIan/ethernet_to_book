@@ -85,7 +85,6 @@ module slow_fast_cdc # (
             end
 
             // Only detect new grey-code on first two stable samples
-            // Using 'R' and 'RR' works in sim but comparing on an unstable signal is bad practice
             assign newGrey        = (dataEncodRRR[GREY_WIDTH+7:8] != dataEncodRR[GREY_WIDTH+7:8]);
             assign rdDataValidOut = ((dataEncodRRR[GREY_WIDTH+7:8] == nextGreyR) & newGreyR);
             assign rdDataErrOut   = ((dataEncodRRR[GREY_WIDTH+7:8] != nextGreyR) & newGreyR);

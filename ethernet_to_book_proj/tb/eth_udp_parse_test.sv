@@ -8,7 +8,6 @@ import tb_pkg::*;
 module eth_udp_parse_test;
 
     const int         CLK_250_MHZ_PERIOD = 4;
-
     const int         ETH_HEADER_LEN     = 14; // Not included in IP length
     const int         IP_HEADER_LEN      = 20;
     const int         UDP_HEADER_LEN     = 8;
@@ -96,15 +95,15 @@ module eth_udp_parse_test;
         moldHdr.seqNum = 3;
 
         itchOrder = '{
-        msgType    : ADD_MSG_TYPE,
-        locate     : 16'hBE42,
-        trackNum   : 16'h0005,
-        timeStamp  : 48'h000000000123,
-        refNum     : 64'h111B1673DEFB4321,
-        buySell    : SELL,
-        shares     : 32'h00000184,
-        stock      : AAPL,
-        price      : 32'h0021FEFC};
+            msgType    : ADD_MSG_TYPE,
+            locate     : 16'hBE42,
+            trackNum   : 16'h0005,
+            timeStamp  : 48'h000000000123,
+            refNum     : 64'h111B1673DEFB4321,
+            buySell    : SELL,
+            shares     : 32'h00000184,
+            stock      : AAPL,
+            price      : 32'h0021FEFC};
 
         // Send ethernet frame header
         send_eth_header(parserIf, ethHdr);

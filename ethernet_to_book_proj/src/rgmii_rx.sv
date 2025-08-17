@@ -11,7 +11,7 @@ module rgmii_rx (
     input  logic       rxCtrlIn,
     input  logic       intBIn,
     input  logic       mmcmLockedIn,
-    
+
     output logic [7:0] rxDataOut,
     output logic       rxDataValidOut,
     output logic       rxDataLastOut); // unused
@@ -39,8 +39,8 @@ module rgmii_rx (
         .C(rxClkIn),          // rx clk (1.5ns delay already induced)
         .CE(mmcmLockedIn),    // indicates delayed clock is stable
         .D(rxCtrlIn),         // data from PHY
-        .R(1'b0),             // reset to '1's
-        .S(rstIn));           // reset to '0's
+        .R(rstIn),            // reset to '0's
+        .S(1'b0));            // reset to '1's
 
     always_ff @(posedge rxClkIn) begin
         if (rstIn) begin

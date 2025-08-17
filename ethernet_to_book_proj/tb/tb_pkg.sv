@@ -34,12 +34,12 @@ package tb_pkg;
         input logic [7:0] dataByte);
 
         begin
-            @(posedge rxIf.rxClk);
-            rxIf.rxCtrl = 1'b1;
-            rxIf.rxData = dataByte[7:4];
-            @(negedge rxIf.rxClk);
-            rxIf.rxCtrl = 1'b1;
-            rxIf.rxData = dataByte[3:0];
+            @(posedge rxIf.clk);
+            rxIf.ctrl = 1'b1;
+            rxIf.data = dataByte[7:4];
+            @(negedge rxIf.clk);
+            rxIf.ctrl = 1'b1;
+            rxIf.data = dataByte[3:0];
         end
     endtask
 
@@ -143,7 +143,7 @@ package tb_pkg;
             $display("Udp length:       0x%H",   udpHeader.len);
             $display("Check sum:        0x%H",   udpHeader.chkSum);
             for (int i = 0; i < 8; i++) begin
-                send_eth_udp_byte(rxIf, udpHeader.srcPort[15:8]);
+                send_rgmii_byte(rxIf, udpHeader.srcPort[15:8]);
                 udpHeader = udpHeader << 8;
             end
         end
@@ -177,7 +177,7 @@ package tb_pkg;
             $display("Message count:   0x%H",   moldHeader.msgCnt);
             $display("Mold length:     0x%H",   moldHeader.moldLen);
             for (int i = 0; i < 22; i++) begin
-                send_eth_udp_byte(rxIf, moldHeader.sessId[79:72]);
+                send_rgmii_byte(rxIf, moldHeader.sessId[79:72]);
                 moldHeader = moldHeader << 8;
             end
         end
@@ -217,7 +217,7 @@ package tb_pkg;
             $display("Price:                  0x%H", itchData.price);
 
             for (int i = 0; i < 36; i++) begin
-                send_eth_udp_byte(rxIf, itchData.msgType);
+                send_rgmii_byte(rxIf, itchData.msgType);
                 itchData = itchData << 8;
             end
         end
@@ -251,11 +251,9 @@ package tb_pkg;
         input logic [7:0] expectedDataByte);
 
         begin
-            @(posedge parserOutIf.clk);
-            if (parserOutIf.dataValid == 1'b1) begin
-                assert(parserOutIf.data == expectedDataByte) else $fatal("Byte Received: 0x%H Expected: 0x%H   INCORRECT :(", parserOutIf.data, expectedDataByte);
-                $display("Byte Received: 0x%H", parserOutIf.data, " Expected: 0x%H", expectedDataByte, "  CORRECT :)");
-            end
+            @(posedge parserOutIf.dataValid);
+            assert(parserOutIf.data == expectedDataByte) else $fatal("Byte Received: 0x%H Expected: 0x%H   INCORRECT :(", parserOutIf.data, expectedDataByte);
+            $display("Byte Received: 0x%H", parserOutIf.data, " Expected: 0x%H", expectedDataByte, "  CORRECT :)");
         end
     endtask
 

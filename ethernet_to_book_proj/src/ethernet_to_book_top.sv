@@ -24,6 +24,7 @@ module ethernet_to_book_top (
 
     output logic        itchDataValidOut,
     output logic [7:0 ] itchDataOut,
+    output logic        packetLostOut,
 
     input  logic        intBIn,
     output logic        phyRstBOut,
@@ -100,7 +101,8 @@ module ethernet_to_book_top (
         .dataValidIn(rdDataValid),
         .dataErrIn(rdDataErr),
         .itchDataValidOut(itchValid),
-        .itchDataOut(itchData));
+        .itchDataOut(itchData),
+        .packetLostOut(packetLostOut));
 
     ////////////////////////////////////////////
     // Outputs
