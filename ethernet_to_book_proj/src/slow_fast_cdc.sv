@@ -1,7 +1,10 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Dev: Ian Rider
-// Purpose: Generate local clocks with 100Mhz board clock and 125Mhz PHY rxClk
+// Purpose: Transfer bytes from MAC domain (125Mhz) to unrelated 250Mhz domain.
+//          Includes both tranditional async FIFO method as well as lower latency
+//          grey-code tagged method. The latter is potentially novel and has not
+//          been thoroughly verified.
 //////////////////////////////////////////////////////////////////////////////////
 
 module slow_fast_cdc # (
@@ -20,11 +23,12 @@ module slow_fast_cdc # (
     output logic       rdDataErrOut);
 
 
-    generate 
+    generate
+        // FAST CLOCK MUST BE AT LEAST TWICE AS FAST
         if (XPERIMENTAL_LOW_LAT_CDC) begin
             // GREY-CODE TAGGED CDC (lower latency but probably not as safe as async fifio)
             // Latency is about 14ns-16ns (depends on phase relationship) compared to ~34ns latency of FIFO
-            logic [GREY_WIDTH+7:0] dataGreyR, dataEncodR, dataEncodRR, dataEncodRRR; 
+            logic [GREY_WIDTH+7:0] dataGreyR, dataEncodR, dataEncodRR, dataEncodRRR;
             logic [GREY_WIDTH-1:0] greyAppendR, nextGreyR, cntSlow, cntFast;
             logic                  newGrey, newGreyR;
 
@@ -53,11 +57,12 @@ module slow_fast_cdc # (
                 // Only rst bc control signals assigned concurrently based off these
                 if (rdRstIn) begin
                     dataEncodR   <= '0;
-                    dataEncodRR  <= '0; 
+                    dataEncodRR  <= '0;
                     dataEncodRRR <= '0;
                 end else begin
-                    dataEncodR   <= dataGreyR;
-                    dataEncodRR  <= dataEncodR;
+                    // Give data an extra clock to settle all bits
+                    dataEncodR   <= {dataGreyR[GREY_WIDTH+7:8], 8'h00};
+                    dataEncodRR  <= {dataEncodR[GREY_WIDTH+7:8], dataGreyR[7:0]};
                     dataEncodRRR <= dataEncodRR;
                 end
             end
@@ -80,12 +85,11 @@ module slow_fast_cdc # (
             end
 
             // Only detect new grey-code on first two stable samples
-            // Using 'R' and 'RR' works in sim but comparing on an unstable signal is bad practice
             assign newGrey        = (dataEncodRRR[GREY_WIDTH+7:8] != dataEncodRR[GREY_WIDTH+7:8]);
             assign rdDataValidOut = ((dataEncodRRR[GREY_WIDTH+7:8] == nextGreyR) & newGreyR);
             assign rdDataErrOut   = ((dataEncodRRR[GREY_WIDTH+7:8] != nextGreyR) & newGreyR);
             assign rdDataOut      = dataEncodRRR[7:0];
-    
+
         end else begin
             // ASYNC FIFO
             logic wrEn;
@@ -104,7 +108,7 @@ module slow_fast_cdc # (
                 .READ_DATA_WIDTH(8),
                 .READ_MODE("fwft"),
                 .SIM_ASSERT_CHK(1),
-                .WRITE_DATA_WIDTH(8)) 
+                .WRITE_DATA_WIDTH(8))
             xpm_fifo_async_inst (
                 .rst(wrRstIn),            // Write domain
 

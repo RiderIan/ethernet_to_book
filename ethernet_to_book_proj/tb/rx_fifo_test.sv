@@ -24,22 +24,6 @@ module rx_fifo_test;
     real        readTime[0:499];
 
     ////////////////////////////////////////////
-    // DUT: rxClkLcl(125Mhz) -> 250Mhz CDC
-    ////////////////////////////////////////////
-    slow_fast_cdc # (
-        .XPERIMENTAL_LOW_LAT_CDC(1'b1))
-    dut (
-        .wrRstIn(rstRxLcl),        
-        .wrClkIn(clk125),
-        .wrEnIn(rxDataValid),
-        .wrDataIn(rxData),
-        .rdRstIn(rstRxLcl), 
-        .rdClkIn(clk250),
-        .rdDataOut(rx250Data),
-        .rdDataValidOut(rdDataValid));
-
-
-    ////////////////////////////////////////////
     // Clock gen
     ////////////////////////////////////////////
     always #(CLK_125_MHX_PERIOD/2) clk125 = ~clk125;
@@ -53,6 +37,21 @@ module rx_fifo_test;
             #(CLK_250_MHZ_PERIOD/2) clk250 = ~clk250;
         end
     end
+
+    ////////////////////////////////////////////
+    // DUT: rxClkLcl(125Mhz) -> 250Mhz CDC
+    ////////////////////////////////////////////
+    slow_fast_cdc # (
+        .XPERIMENTAL_LOW_LAT_CDC(1'b1)) // 0=async fifo, 1=grey-code tagged (lower latency)
+    dut (
+        .wrRstIn(rstRxLcl),        
+        .wrClkIn(clk125),
+        .wrEnIn(rxDataValid),
+        .wrDataIn(rxData),
+        .rdRstIn(rstRxLcl), 
+        .rdClkIn(clk250),
+        .rdDataOut(rx250Data),
+        .rdDataValidOut(rdDataValid));
 
     ////////////////////////////////////////////
     // Write side stimulus

@@ -9,33 +9,38 @@
 
 module ethernet_to_book_top (
 
-    input  logic       clkIn,
-    input  logic       rstIn,
+    input  logic        clkIn,
+    input  logic        rstIn,
     //inout  logic       mdioBi,
     //output logic       mdClkOut,
 
-    input  logic [3:0] rxDataIn,    
-    input  logic       rxCtrlIn,
-    input  logic       rxClkIn,
+    input  logic [3:0]  rxDataIn,
+    input  logic        rxCtrlIn,
+    input  logic        rxClkIn,
 
-    output logic [3:0] txDataOut,
-    output logic       txCtrlOut,
-    output logic       txClkOut,
+    output logic [3:0]  txDataOut,
+    output logic        txCtrlOut,
+    output logic        txClkOut,
 
-    input  logic       intBIn,
-    output logic       phyRstBOut);
+    output logic        itchDataValidOut,
+    output logic [7:0 ] itchDataOut,
+    output logic        packetLostOut,
+
+    input  logic        intBIn,
+    output logic        phyRstBOut,
+    output logic        lockedOut);
 
     // Signals
-    logic       rstTxLcl,    rstTx,       rst250, rstRxLcl;    
+    logic       rstTxLcl,    rstTx,       rst250, rstRxLcl;
     logic       txClkLcl,    rxClkLcl,    clk250;
-    logic       mmcm0Locked, mmcm1Locked; 
-    logic [7:0] rxData,      rx250Data;
-    logic       rxDataValid, rdDataValid, rdDataErr;
+    logic       mmcm0Locked, mmcm1Locked;
+    logic [7:0] rxData,      rx250Data, itchData;
+    logic       rxDataValid, rdDataValid, rdDataErr, itchValid;
 
     ////////////////////////////////////////////
     // Clocks and Resets
     ////////////////////////////////////////////
-    (* keep_hierarchy = "yes" *) clks_rsts clks_rsts_inst (
+    clks_rsts clks_rsts_inst (
         .rstIn(rstIn),
         .clkIn(clkIn),
         .rxClkIn(rxClkIn),
@@ -50,12 +55,10 @@ module ethernet_to_book_top (
         .mmcm0LockedOut(mmcm0Locked),
         .mmcm1LockedOut(mmcm1Locked));
 
-    assign phyRstBOut = rstTx; // may want more logic driving this
-
     ////////////////////////////////////////////
     // RGMII
     ////////////////////////////////////////////
-    (* keep_hierarchy = "yes" *) rgmii mac_inst (
+    rgmii mac_inst (
         .intBIn(intBIn),
         .mmcm0LockedIn(mmcm0Locked),
         .mmcm1LockedIn(mmcm1Locked),
@@ -75,10 +78,10 @@ module ethernet_to_book_top (
     ////////////////////////////////////////////
     // CDC slow (125MHz) -> fast (250MHz+)
     ////////////////////////////////////////////
-    (* keep_hierarchy = "yes" *) slow_fast_cdc #(
+    slow_fast_cdc #(
         .XPERIMENTAL_LOW_LAT_CDC(1'b1))
     slow_fast_cdc_inst (
-        .wrRstIn(rstRxLcl),        
+        .wrRstIn(rstRxLcl),
         .wrClkIn(rxClkLcl),
         .wrEnIn(rxDataValid),
         .wrDataIn(rxData),
@@ -91,12 +94,24 @@ module ethernet_to_book_top (
     ////////////////////////////////////////////
     // Ethernet/IP/UDP/MoldUdp64 header parser
     ////////////////////////////////////////////
-    (* keep_hierarchy = "yes" *) eth_udp_parser eth_udp_parser_inst (
+    eth_udp_parser eth_udp_parser_inst (
         .rstIn(rst250),
         .clkIn(clk250),
         .dataIn(rx250Data),
         .dataValidIn(rdDataValid),
-        .dataErrIn(rdDataErr));
-    
+        .dataErrIn(rdDataErr),
+        .itchDataValidOut(itchValid),
+        .itchDataOut(itchData),
+        .packetLostOut(packetLostOut));
+
+    ////////////////////////////////////////////
+    // Outputs
+    ////////////////////////////////////////////
+    assign phyRstBOut       = rstTx; // may want more logic driving this
+    assign lockedOut        = mmcm0Locked & mmcm1Locked;
+
+    // Temporary to prevent synth optimization
+    assign itchDataValidOut = itchValid;
+    assign itchDataOut      = itchData;
 
 endmodule
