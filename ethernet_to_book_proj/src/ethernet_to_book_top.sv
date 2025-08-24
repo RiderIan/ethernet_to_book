@@ -79,7 +79,7 @@ module ethernet_to_book_top (
     // CDC slow (125MHz) -> fast (250MHz+)
     ////////////////////////////////////////////
     slow_fast_cdc #(
-        .XPERIMENTAL_LOW_LAT_CDC(1'b1))
+        .XPERIMENTAL_LOW_LAT_CDC(1'b0))
     slow_fast_cdc_inst (
         .wrRstIn(rstRxLcl),
         .wrClkIn(rxClkLcl),

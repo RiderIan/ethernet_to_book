@@ -98,6 +98,7 @@ module slow_fast_cdc # (
             logic rdEn;
             logic rdEmpty;
             logic rdRstBusy;
+            logic [7:0] rdData;
             // Should never be full as 250 domain will constantly read when not empty
             assign wrEn = (wrEnIn   & ~wrFull    & ~wrRstBusy & ~rdRstBusy);
             assign rdEn = (~rdEmpty & ~wrRstBusy & ~rdRstBusy);
@@ -123,10 +124,13 @@ module slow_fast_cdc # (
                 .rd_clk(rdClkIn),         // In
                 .rd_en(rdEn),             // In
                 .empty(rdEmpty),          // Out
-                .dout(rdDataOut),         // Out
+                .dout(rdData),            // Out
                 .rd_rst_busy(rdRstBusy)); // Out
 
-            assign rdDataValidOut = rdEn;
+            always_ff @(posedge rdClkIn) begin
+                rdDataOut      <= rdData;
+                rdDataValidOut <= rdEn;
+            end
         end
     endgenerate
 

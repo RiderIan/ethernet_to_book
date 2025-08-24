@@ -23,4 +23,4 @@ create_generated_clock -name rx_clk_125_dly -source [get_ports rxClkIn] -edges {
 # Set max delay to period of faster clk to ensure CDC bits are stable as async fifo method is not being used
 set_max_delay 4 -from [get_clocks rx_clk_125_dly] -to [get_clocks clk_250] -datapath_only
 # May need for async fifo method:
-# set_false_path  -through [get_cells -hierarchical -filter {NAME =~ "*xpm_fifo_async_inst*" && NAME =~ "*fifo_rd_rst_ic_reg*"}]
+set_false_path  -through [get_cells -hierarchical -filter {NAME =~ "*xpm_fifo_async_inst*" && NAME =~ "*fifo_rd_rst_ic_reg*"}]
