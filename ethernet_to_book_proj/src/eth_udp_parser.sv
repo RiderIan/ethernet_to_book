@@ -31,7 +31,7 @@ module eth_udp_parser (
     logic [16:0] ipChkSumAccumR;
     logic dstMacCheckR, ipV4CheckR, ipV6CheckR;
     logic ipVerCheckR, protocolCheckR, nyseIpCheckR, ipChkSumPassR, ipPackTwoBytesR, ipTogglePulseR;
-    logic udpSrcCheckR, udpDstCheckR, passItch;
+    logic udpDstCheckR, passItch;
     logic moldDoneR;
     logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR;
 
@@ -123,7 +123,7 @@ module eth_udp_parser (
             if (byteCntR == (IP_HDR_DONE + 1)) begin
                 if (ipHeaderR.ver == IP_V4_TYPE)
                     ipVerCheckR    <= 1'b1;
-                if (ipHeaderR.dstIp == NYSE_DST_IP)
+                if (ipHeaderR.dstIp == DST_IP)
                     nyseIpCheckR   <= 1'b1;
                 if (ipHeaderR.protocol == PROTOCOL)
                     protocolCheckR <= 1'b1;
@@ -151,17 +151,12 @@ module eth_udp_parser (
 
     always_ff @(posedge clkIn) begin : udp_header_check
         if (rstIn) begin
-            udpSrcCheckR <= 1'b0;
             udpDstCheckR <= 1'b0;
         end else begin
             if (byteCntR == (UDP_HDR_DONE + 1)) begin
-                if (udpHeaderR.srcPort == NYSE_UDP_SRC_PORT)
-                    udpSrcCheckR <= 1'b1;
-
                 if (udpHeaderR.dstPort == UDP_DEST_PORT)
                     udpDstCheckR <= 1'b1;
             end else if (endOfFrameDetR) begin
-                udpSrcCheckR <= 1'b0;
                 udpDstCheckR <= 1'b0;
             end
         end
@@ -274,9 +269,8 @@ module eth_udp_parser (
     ////////////////////////////////////////////
     // ITCH passthrough control
     ////////////////////////////////////////////
-    assign passItch        =  dstMacCheckR & ipV4CheckR   & protocolCheckR &
-                              udpSrcCheckR & udpDstCheckR & ipVerCheckR    &
-                              moldDoneR    & nyseIpCheckR & ipChkSumPassR;
+    assign passItch        =  dstMacCheckR & ipV4CheckR & protocolCheckR &  udpDstCheckR &
+                              ipVerCheckR  & moldDoneR  & nyseIpCheckR   &  ipChkSumPassR;
 
     assign itchDataOut      = dataIn;
     assign itchDataValidOut = (dataValidIn & passItch);
