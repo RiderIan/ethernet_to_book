@@ -124,7 +124,7 @@ module slow_fast_cdc # (
                 .rd_clk(rdClkIn),         // In
                 .rd_en(rdEn),             // In
                 .empty(rdEmpty),          // Out
-                .dout(rdData),         // Out
+                .dout(rdData),            // Out
                 .rd_rst_busy(rdRstBusy)); // Out
 
             always_ff @(posedge rdClkIn) begin
