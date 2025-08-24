@@ -39,8 +39,8 @@ module mac_to_parse_test;
 
     // Headers
     ethHeaderType  ethHdr  =  {DEVICE_MAC, SRC_MAC, ETH_IP_V4_TYPE};
-    ipHeaderType   ipHdr   =  {IP_V4_TYPE, DSCP_ECN, IP_V4_TOTAL_LEN[15:0], ID, FLAGS, TTL, PROTOCOL, 16'h0000, SRC_IP, NYSE_DST_IP};
-    udpHeaderType  udpHdr  =  {NYSE_UDP_SRC_PORT, UDP_DEST_PORT, UDP_LENGTH[15:0], 16'h0000};
+    ipHeaderType   ipHdr   =  {IP_V4_TYPE, DSCP_ECN, IP_V4_TOTAL_LEN[15:0], ID, FLAGS, TTL, PROTOCOL, 16'h0000, SRC_IP, DST_IP};
+    udpHeaderType  udpHdr  =  {UDP_SRC_PORT, UDP_DEST_PORT, UDP_LENGTH[15:0], 16'h0000};
     moldHeaderType moldHdr = '{
         sessId    : 80'h00000000000000000004, // Random
         seqNum    : 64'h0000000000000001,     // Increments for every new message on session ID

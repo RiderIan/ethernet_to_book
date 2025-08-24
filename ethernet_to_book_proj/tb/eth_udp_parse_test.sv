@@ -37,11 +37,11 @@ module eth_udp_parse_test;
     ethHeaderType ethHdr = {DEVICE_MAC, SRC_MAC, ETH_IP_V4_TYPE};
 
     // IP Header
-    ipHeaderType ipHdr = {IP_V4_TYPE, DSCP_ECN, IP_V4_TOTAL_LEN[15:0], ID, FLAGS, TTL, PROTOCOL, 16'h0000, SRC_IP, NYSE_DST_IP};
+    ipHeaderType ipHdr = {IP_V4_TYPE, DSCP_ECN, IP_V4_TOTAL_LEN[15:0], ID, FLAGS, TTL, PROTOCOL, 16'h0000, SRC_IP, DST_IP};
     logic [15:0] ipChkSum;
 
     // UDP Header
-    udpHeaderType udpHdr = {NYSE_UDP_SRC_PORT, UDP_DEST_PORT, UDP_LENGTH[15:0], 16'h0000};
+    udpHeaderType udpHdr = {UDP_SRC_PORT, UDP_DEST_PORT, UDP_LENGTH[15:0], 16'h0000};
 
     // Mold Header
     moldHeaderType moldHdr = '{
