@@ -6,6 +6,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 import pkg::*;
 
+(* shreg_extract = "no" *)
 module eth_udp_parser (
     input  logic       rstIn,
     input  logic       clkIn,
@@ -37,8 +38,8 @@ module eth_udp_parser (
 
     logic [31:0] sessionIdsR[1:32];
 
-    (* shreg_extract = "no" *) logic [15:0] udpLenR, udpLenRR, udpLenRRR, ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR;
-    (* shreg_extract = "no" *) logic [15:0] sessIdR, sessIdRR, sessIdRRR, seqNumR, seqNumRR, seqNumRRR;
+    logic [15:0] udpLenR, udpLenRR, udpLenRRR;
+    logic [15:0] ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR;
 
     ////////////////////////////////////////////
     // Ethernet header
@@ -141,7 +142,6 @@ module eth_udp_parser (
     ////////////////////////////////////////////
     // UDP header
     ////////////////////////////////////////////
-    // TODO: UDP checksum?
     udpHeaderType udpHeaderR;
 
     always_ff @(posedge clkIn) begin : udp_header_capture
@@ -170,9 +170,11 @@ module eth_udp_parser (
     ////////////////////////////////////////////
     // MoldUDP64 header
     ////////////////////////////////////////////
-    // TODO: implement sessionID/sequence number checker
     moldHeaderType moldHeaderR;
-    logic [143:0] sessSeqR;
+    logic  [143:0] sessSeqR;
+    logic  [ 79:0] sessIdR;
+    logic  [ 63:0] seqNumR;
+    logic          sessSeqDoneR;
 
     always_ff @(posedge clkIn) begin : mold_header_capture
         if (dataValidIn & (byteCntR < MOLD_HDR_DONE))
@@ -185,26 +187,26 @@ module eth_udp_parser (
             sessSeqR <= (sessSeqR << 8) | dataIn;
     end
 
-    // always_ff @(posedge clkIn) begin : sess_seq_pipe
-    //     sessIdR   <= moldHeaderR.sessId;
-    //     sessIdRR  <= sessIdR;
-    //     sessIdRRR <= sessIdRR;
-//
-    //     seqNumR   <= moldHeaderR.seqNum;
-    //     seqNumRR  <= seqNumR;
-    //     seqNumRRR <= seqNumRRR;
-//
-    // end
+    always_ff @(posedge clkIn) begin : sess_seq_pipe
+        sessIdR <= sessSeqR[143:64];
+        seqNumR <= sessSeqR[63:0];
+    end
 
     always_ff @(posedge clkIn) begin : mold_header_check
         if (rstIn) begin
             packetLostOut <= 1'b0;
+            sessSeqDoneR  <= 1'b0;
         end else begin
             packetLostOut <= 1'b0;
-            if (byteCntR == (SESS_SEQ_DONE + 1)) begin
-                sessionIdsR[sessSeqR[143:64]] <= sessSeqR[63:0];
+            sessSeqDoneR  <= 1'b0;
 
-                if (sessSeqR[63:0] != sessionIdsR[sessSeqR[143:64]])
+            if (byteCntR == (SESS_SEQ_DONE + 1))
+                sessSeqDoneR <= 1'b1;
+
+            if (sessSeqDoneR) begin
+                sessionIdsR[sessIdR] <= seqNumR;
+
+                if (seqNumR != sessionIdsR[sessIdR])
                     packetLostOut <= 1'b1;
             end
         end
