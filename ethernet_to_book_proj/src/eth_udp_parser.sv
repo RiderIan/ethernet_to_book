@@ -6,7 +6,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 import pkg::*;
 
-(* shreg_extract = "no" *)
 module eth_udp_parser (
     input  logic       rstIn,
     input  logic       clkIn,
@@ -37,9 +36,10 @@ module eth_udp_parser (
     logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR;
 
     logic [31:0] sessionIdsR[1:32];
+    logic [31:0] currSeqNumR;
 
-    logic [15:0] udpLenR, udpLenRR, udpLenRRR;
-    logic [15:0] ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR;
+    (* shreg_extract = "no" *) logic [15:0] udpLenR, udpLenRR, udpLenRRR;
+    (* shreg_extract = "no" *) logic [15:0] ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR;
 
     ////////////////////////////////////////////
     // Ethernet header
@@ -171,9 +171,9 @@ module eth_udp_parser (
     // MoldUDP64 header
     ////////////////////////////////////////////
     moldHeaderType moldHeaderR;
-    logic  [143:0] sessSeqR;
-    logic  [ 79:0] sessIdR;
-    logic  [ 63:0] seqNumR;
+    (* shreg_extract = "no" *) logic  [143:0] sessSeqR;
+    (* shreg_extract = "no" *) logic  [ 79:0] sessIdR;
+    (* shreg_extract = "no" *) logic  [ 63:0] seqNumR;
     logic          sessSeqDoneR;
 
     always_ff @(posedge clkIn) begin : mold_header_capture
@@ -196,9 +196,11 @@ module eth_udp_parser (
         if (rstIn) begin
             packetLostOut <= 1'b0;
             sessSeqDoneR  <= 1'b0;
+            currSeqNumR   <=   '0;
         end else begin
             packetLostOut <= 1'b0;
             sessSeqDoneR  <= 1'b0;
+            currSeqNumR   <= sessionIdsR[sessIdR];
 
             if (byteCntR == (SESS_SEQ_DONE + 1))
                 sessSeqDoneR <= 1'b1;
@@ -206,7 +208,7 @@ module eth_udp_parser (
             if (sessSeqDoneR) begin
                 sessionIdsR[sessIdR] <= seqNumR;
 
-                if (seqNumR != sessionIdsR[sessIdR])
+                if (seqNumR != currSeqNumR)
                     packetLostOut <= 1'b1;
             end
         end
