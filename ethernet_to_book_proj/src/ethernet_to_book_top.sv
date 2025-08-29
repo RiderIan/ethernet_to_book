@@ -35,7 +35,7 @@ module ethernet_to_book_top (
     logic       txClkLcl,    rxClkLcl,    clk250;
     logic       mmcm0Locked, mmcm1Locked;
     logic [7:0] rxData,      rx250Data, itchData;
-    logic       rxDataValid, rdDataValid, rdDataErr, itchValid;
+    logic       rxDataValid, rdDataValid, itchValid;
 
     ////////////////////////////////////////////
     // Clocks and Resets
@@ -79,7 +79,7 @@ module ethernet_to_book_top (
     // CDC slow (125MHz) -> fast (250MHz+)
     ////////////////////////////////////////////
     slow_fast_cdc #(
-        .XPERIMENTAL_LOW_LAT_CDC(1'b0))
+        .LOW_LAT_CDC(1'b1))
     slow_fast_cdc_inst (
         .wrRstIn(rstRxLcl),
         .wrClkIn(rxClkLcl),
@@ -88,8 +88,7 @@ module ethernet_to_book_top (
         .rdRstIn(rst250),
         .rdClkIn(clk250),
         .rdDataOut(rx250Data),
-        .rdDataValidOut(rdDataValid),
-        .rdDataErrOut(rdDataErr));
+        .rdDataValidOut(rdDataValid));
 
     ////////////////////////////////////////////
     // Ethernet/IP/UDP/MoldUdp64 header parser
@@ -99,7 +98,6 @@ module ethernet_to_book_top (
         .clkIn(clk250),
         .dataIn(rx250Data),
         .dataValidIn(rdDataValid),
-        .dataErrIn(rdDataErr),
         .itchDataValidOut(itchValid),
         .itchDataOut(itchData),
         .packetLostOut(packetLostOut));

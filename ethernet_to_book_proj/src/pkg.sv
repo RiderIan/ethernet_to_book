@@ -10,12 +10,12 @@ package pkg;
     // Constants
     ////////////////////////////////////////////
     // ITCH
-    const logic [ 7:0] ADD_MSG_TYPE      = 8'h41;               // "A" ascii
-    const logic [ 7:0] EXECUTED_MSG_TYPE = 8'h45;               // "E" ascii
-    const logic [ 7:0] CANCEL_MSG_TYPE   = 8'h58;               // "X" ascii
-    const logic [ 7:0] BUY               = 8'h42;               // "B" ascii
-    const logic [ 7:0] SELL              = 8'h53;               // "S" ascii
-    const logic [63:0] AAPL              = 8'h4141504C00000000; // "APPL" ascii -> APPLE symbol
+    const logic [ 7:0] ADD_MSG_TYPE      =  8'h41;               // "A" ascii
+    const logic [ 7:0] EXECUTED_MSG_TYPE =  8'h45;               // "E" ascii
+    const logic [ 7:0] CANCEL_MSG_TYPE   =  8'h58;               // "X" ascii
+    const logic [ 7:0] BUY               =  8'h42;               // "B" ascii
+    const logic [ 7:0] SELL              =  8'h53;               // "S" ascii
+    const logic [63:0] AAPL              = 64'h4141504C00000000; // "APPL" ascii -> APPLE symbol
 
     // Ethernet header
     // IpV4 Multicast -> 01:00:5E
@@ -103,5 +103,21 @@ package pkg;
         logic [47:0] timeStamp;
         logic [63:0] refNum;
     } itchOrderExecutedType;
+
+
+    virtual class grayBin #(int WIDTH);
+        static function automatic logic [WIDTH-1:0] bin2gray (input logic [WIDTH-1:0] bin);
+            return (bin >> 1) ^ bin;
+        endfunction
+
+        static function automatic logic [WIDTH-1:0] gray2bin (input logic [WIDTH-1:0] gray);
+            logic [WIDTH-1:0] bin;
+            bin[WIDTH-1] = gray[WIDTH-1];
+            for (int i = WIDTH-2; i >= 0; i--) begin
+                bin[i] = bin[i+1] ^ gray[i];
+            end
+            return bin;
+        endfunction
+    endclass
 
 endpackage;

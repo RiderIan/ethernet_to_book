@@ -13,7 +13,6 @@ module eth_udp_parser (
     // CDC interface
     input  logic [7:0] dataIn,
     input  logic       dataValidIn,
-    input  logic       dataErrIn,
 
     output logic       itchDataValidOut,
     output logic [7:0] itchDataOut,
@@ -35,11 +34,11 @@ module eth_udp_parser (
     logic moldDoneR;
     logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR;
 
-    logic [31:0] sessionIdsR[1:32];
+    logic [31:0] sessionIdsR [1:32];
     logic [31:0] currSeqNumR;
 
     (* shreg_extract = "no" *) logic [15:0] udpLenR, udpLenRR, udpLenRRR;
-    (* shreg_extract = "no" *) logic [15:0] ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR;
+    (* shreg_extract = "no" *) logic [15:0] ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR, chkSumDataR;
 
     ////////////////////////////////////////////
     // Ethernet header
@@ -89,6 +88,7 @@ module eth_udp_parser (
             ipChkSumAccumR  <= '0;
             onesCompSumR    <= '0;
             dataR           <= '0;
+            // chkSumDataR     <= '0;
         end else begin
             // Capture
             ipPackTwoBytesR <= 1'b0;
@@ -101,6 +101,9 @@ module eth_udp_parser (
             end else if (endOfFrameDetR) begin
                 dataR           <= '0;
             end
+
+            // helps timing i guess
+            // chkSumDataR <= {dataR, dataIn};
 
             // Checksum
             if (ipPackTwoBytesR & (byteCntR < IP_HDR_DONE) & (byteCntR >= ETH_HDR_DONE)) begin
