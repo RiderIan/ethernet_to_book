@@ -42,13 +42,13 @@ module rx_fifo_test;
     // DUT: rxClkLcl(125Mhz) -> 250Mhz CDC
     ////////////////////////////////////////////
     slow_fast_cdc # (
-        .XPERIMENTAL_LOW_LAT_CDC(1'b1)) // 0=async fifo, 1=grey-code tagged (lower latency)
+        .LOW_LAT_CDC(1'b1)) // 0=xpm afifo, 1=custom low latency afifo
     dut (
-        .wrRstIn(rstRxLcl),        
+        .wrRstIn(rstRxLcl),
         .wrClkIn(clk125),
         .wrEnIn(rxDataValid),
         .wrDataIn(rxData),
-        .rdRstIn(rstRxLcl), 
+        .rdRstIn(rstRxLcl),
         .rdClkIn(clk250),
         .rdDataOut(rx250Data),
         .rdDataValidOut(rdDataValid));
@@ -93,7 +93,7 @@ module rx_fifo_test;
                 i++;
             end
         end
-      
+
         $display(" --- TEST PASSED ---");
         #50
         $finish;

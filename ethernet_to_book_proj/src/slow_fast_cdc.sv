@@ -3,14 +3,17 @@
 // Dev: Ian Rider
 // Purpose: Transfer bytes from MAC domain (125Mhz) to unrelated 250Mhz domain.
 //          Includes both tranditional async FIFO method as well as lower latency
-//          grey-code tagged method. The latter is potentially novel and has not
-//          been thoroughly verified.
+//          circular AFIFO approach.
+//
+//          Custom AFIFO has 14ns of latency as is compared to 42ns of latency of xpm
+//          AFIFIO without any additional pipelining (which is required to pass timing).
+//          Latency was measure with slow/fast clocks perfectly in phase.
 //////////////////////////////////////////////////////////////////////////////////
 
 module slow_fast_cdc # (
-    parameter logic XPERIMENTAL_LOW_LAT_CDC = 1'b0, // TRUE:  Grey-code tagged CDC (not verified) FALSE: Traditional async fifo CDC
-    parameter int   GREY_WIDTH  = 8)                // Width of grey-code counter appened to data, wider=safer?
-(
+    parameter logic LOW_LAT_CDC = 1'b0,
+    parameter int   RAM_DEPTH   = 8) (
+
     input  logic       wrRstIn,
     input  logic       wrClkIn,
     input  logic       wrEnIn,
@@ -19,79 +22,79 @@ module slow_fast_cdc # (
     input  logic       rdRstIn,
     input  logic       rdClkIn,
     output logic [7:0] rdDataOut,
-    output logic       rdDataValidOut,
-    output logic       rdDataErrOut);
+    output logic       rdDataValidOut);
 
+    localparam int DATA_WIDTH = $bits(wrDataIn);
 
     generate
-        // FAST CLOCK MUST BE AT LEAST TWICE AS FAST
-        if (XPERIMENTAL_LOW_LAT_CDC) begin
-            // GREY-CODE TAGGED CDC (lower latency but probably not as safe as async fifio)
-            // Latency is about 14ns-16ns (depends on phase relationship) compared to ~34ns latency of FIFO
-            logic [GREY_WIDTH+7:0] dataGreyR, dataEncodR, dataEncodRR, dataEncodRRR;
-            logic [GREY_WIDTH-1:0] greyAppendR, nextGreyR, cntSlow, cntFast;
-            logic                  newGrey, newGreyR;
+
+        ////////////////////////////////////////////
+        // Custom low-latency CDC approach
+        // 14ns of latency from wrEnIn='1' to rdDataValidOut='1'
+        ////////////////////////////////////////////
+        if (LOW_LAT_CDC) begin
+
+            localparam int ADDR_BITS = $clog2(RAM_DEPTH);
+            logic [DATA_WIDTH-1:0] cdcRamR [0:RAM_DEPTH-1], wrDataR, rdData;
+            logic [ADDR_BITS-1:0]  wrAddrR, rdAddr, grayAddr, graySyncR, graySyncRR, graySyncRRR;
+            logic                  wrEnR, rdDataValid;
 
             ////////////////////////////////////////////
-            // Write side (slow)
+            // Circular AFIFO write side
             ////////////////////////////////////////////
-            always_ff @(posedge wrClkIn) begin
+            always_ff @(posedge wrClkIn) begin : write_data_pipe
                 if (wrRstIn) begin
-                    cntSlow     <= 2'b10;
-                    greyAppendR <= 1'b1;
-                    dataGreyR   <= '0;
+                    wrEnR   <= '0;
+                    wrDataR <= '0;
                 end else begin
-                    if (wrEnIn) begin
-                        dataGreyR   <= {greyAppendR, wrDataIn};
-                        greyAppendR <= cntSlow ^ (cntSlow >> 1); // Convert to grey
-                        cntSlow     <= cntSlow + 1'b1;
-                    end
+                    wrEnR   <= wrEnIn;
+                    wrDataR <= wrDataIn;
                 end
+            end
+
+            always_ff @(posedge wrClkIn) begin : addr_generator
+                if (wrRstIn) begin
+                    wrAddrR <= '0;
+                end else begin
+                    if (wrEnIn)
+                        wrAddrR <= wrAddrR + 1;
+                end
+            end
+
+            assign grayAddr = grayBin#(ADDR_BITS)::bin2gray(wrAddrR);
+
+            always_ff @(posedge wrClkIn) begin : ram_write_port
+                if (wrEnR)
+                    cdcRamR[wrAddrR] <= wrDataR;
             end
 
             ////////////////////////////////////////////
-            // Read side (fast)
+            // Circular AFIFO read side
             ////////////////////////////////////////////
-            // Synchonizer
-            always_ff @(posedge rdClkIn) begin
-                // Only rst bc control signals assigned concurrently based off these
+            always_ff @(posedge rdClkIn) begin : gray_sync
                 if (rdRstIn) begin
-                    dataEncodR   <= '0;
-                    dataEncodRR  <= '0;
-                    dataEncodRRR <= '0;
+                    graySyncR   <= '0;
+                    graySyncRR  <= '0;
+                    graySyncRRR <= '0;
                 end else begin
-                    // Give data an extra clock to settle all bits
-                    dataEncodR   <= {dataGreyR[GREY_WIDTH+7:8], 8'h00};
-                    dataEncodRR  <= {dataEncodR[GREY_WIDTH+7:8], dataGreyR[7:0]};
-                    dataEncodRRR <= dataEncodRR;
+                    graySyncR   <= grayAddr;
+                    graySyncRR  <= graySyncR;
+                    graySyncRRR <= graySyncRR;
                 end
             end
 
-            // Calculate grey-code
-            always_ff @(posedge rdClkIn) begin
-                if (rdRstIn) begin
-                    cntFast   <= 2'b10;
-                    nextGreyR <= 1'b1; // Grey code initalized to 0 so first expected is 1
-                    newGreyR  <= 1'b0;
-                end else begin
-                    // Needs to be delayed a clock to let data get through sycnhronizer
-                    newGreyR     <= newGrey;
+            assign rdAddr         = grayBin#(ADDR_BITS)::gray2bin(graySyncRR);
 
-                    if (newGreyR) begin
-                        nextGreyR <= cntFast ^ (cntFast >> 1); // Convert to grey
-                        cntFast   <= cntFast + 1;
-                    end
-                end
+            always_ff @(posedge rdClkIn) begin : ram_read_port
+                rdDataOut      <= cdcRamR[rdAddr];
+                rdDataValidOut <= graySyncRRR != graySyncRR;
             end
 
-            // Only detect new grey-code on first two stable samples
-            assign newGrey        = (dataEncodRRR[GREY_WIDTH+7:8] != dataEncodRR[GREY_WIDTH+7:8]);
-            assign rdDataValidOut = ((dataEncodRRR[GREY_WIDTH+7:8] == nextGreyR) & newGreyR);
-            assign rdDataErrOut   = ((dataEncodRRR[GREY_WIDTH+7:8] != nextGreyR) & newGreyR);
-            assign rdDataOut      = dataEncodRRR[7:0];
-
+        ////////////////////////////////////////////
+        // Standard Xilinx AFIFO CDC approach
+        // 42ns of latency from wrEnIn='1' to rdDataValidOut='1'
+        ////////////////////////////////////////////
         end else begin
-            // ASYNC FIFO
             logic wrEn;
             logic wrFull;
             logic wrRstBusy;
@@ -106,10 +109,10 @@ module slow_fast_cdc # (
             xpm_fifo_async #(
                 .FIFO_MEMORY_TYPE("distributed"),
                 .FIFO_WRITE_DEPTH(16),
-                .READ_DATA_WIDTH(8),
+                .READ_DATA_WIDTH(DATA_WIDTH),
                 .READ_MODE("fwft"),
                 .SIM_ASSERT_CHK(1),
-                .WRITE_DATA_WIDTH(8))
+                .WRITE_DATA_WIDTH(DATA_WIDTH))
             xpm_fifo_async_inst (
                 .rst(wrRstIn),            // Write domain
 
@@ -127,9 +130,21 @@ module slow_fast_cdc # (
                 .dout(rdData),            // Out
                 .rd_rst_busy(rdRstBusy)); // Out
 
-            always_ff @(posedge rdClkIn) begin
-                rdDataOut      <= rdData;
-                rdDataValidOut <= rdEn;
+            // Latency benchmark based off these connections
+            // assign rdDataOut = rdData;
+            // assign rdDataValidOut = rdEn;
+
+            // Required to pass timing last time it was checked
+            always_ff @(posedge rdClkIn) begin : data_out_pipe
+                rdDataOut <= rdData;
+            end
+
+            always_ff @(posedge rdClkIn) begin : valid_out_pipe
+                if (rdRstIn) begin
+                    rdDataValidOut <= '0;
+                end else begin
+                    rdDataValidOut <= rdEn;
+                end
             end
         end
     endgenerate
