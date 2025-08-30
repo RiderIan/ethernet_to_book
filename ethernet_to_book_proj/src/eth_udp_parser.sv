@@ -102,9 +102,6 @@ module eth_udp_parser (
                 dataR           <= '0;
             end
 
-            // helps timing i guess
-            // chkSumDataR <= {dataR, dataIn};
-
             // Checksum
             if (ipPackTwoBytesR & (byteCntR < IP_HDR_DONE) & (byteCntR >= ETH_HDR_DONE)) begin
                 ipChkSumAccumR <= ipChkSumAccumR + {dataR, dataIn};

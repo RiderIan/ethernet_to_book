@@ -19,23 +19,7 @@ module clks_rsts(
     output logic mmcm1LockedOut);
 
     // Signals
-    logic clkLcl;
-    logic txClkLcl;
-    logic txClk;
-    logic clk250;
-    logic rxClkLcl;
-    logic rstLcl;
-    logic rstLclSync;
-    logic rstR;
-    logic rstRR;
-    logic rstTxLclR;
-    logic rstTxLclRR;
-    logic rstTxR;
-    logic rstTxRR;
-    logic rst250R;
-    logic rst250RR;
-    logic rstRxLclR;
-    logic rstRxLclRR;
+    logic clkLcl,txClkLcl, txClk, clk250, rxClkLcl, rstLcl, rstLclSync;
 
     /////////////////////////////////
     // Clocks and Resets
@@ -49,39 +33,19 @@ module clks_rsts(
         .O(rstLcl));
 
     // System clock domain
-    always_ff @(posedge clkLcl) begin : sys_reset_sync
-        rstR        <= rstLcl;
-        rstRR       <= rstR;
-        rstLclSync  <= rstRR;
-    end
+    synchronizer_ff #(.DEPTH(3)) sync_rst_lcl_inst    (.rstIn(1'b0), .clkIn(clkLcl),   .DIn(rstLcl), .QOut(rstLclSync));
 
     // Tx local domain
-    always_ff @(posedge txClkLcl) begin : tx_lcl_reset_sync
-        rstTxLclR   <= rstLcl;
-        rstTxLclRR  <= rstTxLclR;
-        rstTxLclOut <= rstTxLclRR;
-    end
+    synchronizer_ff #(.DEPTH(3)) sync_tx_lcl_rst_inst (.rstIn(1'b0), .clkIn(txClkLcl), .DIn(rstLcl), .QOut(rstTxLclOut));
 
     // Tx output clock domain
-    always_ff @(posedge txClk) begin : tx_reset_sync
-        rstTxR      <= rstLcl;
-        rstTxRR     <= rstTxR;
-        rstTxOut    <= rstTxRR;
-    end
+    synchronizer_ff #(.DEPTH(3)) sync_tx_rst_inst     (.rstIn(1'b0), .clkIn(txClk),    .DIn(rstLcl), .QOut(rstTxOut));
 
     // 250Mhz local domain
-    always_ff @(posedge clk250) begin : fast_reset_sync
-        rst250R     <= rstLcl;
-        rst250RR    <= rst250R;
-        rst250Out   <= rst250RR;
-    end
+    synchronizer_ff #(.DEPTH(3)) sync_250_rst_inst    (.rstIn(1'b0), .clkIn(clk250),   .DIn(rstLcl), .QOut(rst250Out));
 
     // Rx local domain
-    always_ff @(posedge rxClkLcl) begin : rx_lcl_reset_sync
-        rstRxLclR   <= rstLcl;
-        rstRxLclRR  <= rstRxLclR;
-        rstRxLclOut <= rstRxLclRR;
-    end
+    synchronizer_ff #(.DEPTH(3)) sync_rx_rst_inst     (.rstIn(1'b0), .clkIn(rxClkLcl), .DIn(rstLcl), .QOut(rstRxLclOut));
 
     system_clocks_gen mmcm0_inst (
         .clk_out1(txClkLcl),          // Local 125Mhz for RGMII
@@ -102,5 +66,5 @@ module clks_rsts(
     assign txClkOut    = txClk;
     assign clk250Out   = clk250;
     assign rxClkLclOut = rxClkLcl;
-    
+
 endmodule
