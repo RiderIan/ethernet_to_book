@@ -28,9 +28,7 @@ module clks_rsts(
         .I(clkIn),
         .O(clkLcl));
 
-    BUFG bufg_rst_inst (
-        .I(rstIn),
-        .O(rstLcl));
+    assign rstLcl = rstIn;
 
     // System clock domain
     synchronizer_ff #(.DEPTH(3)) sync_rst_lcl_inst    (.rstIn(1'b0), .clkIn(clkLcl),   .DIn(rstLcl), .QOut(rstLclSync));

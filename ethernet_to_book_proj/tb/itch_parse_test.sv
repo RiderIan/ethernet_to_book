@@ -8,11 +8,15 @@ import tb_pkg::*;
 module itch_parse_test;
     const int         CLK_250_MHZ_PERIOD = 4;
 
-    logic             rst, clk250, packetLost, addValid, delValid, execValid, buySell, buySellStim;
-    logic [15:0]      locate;
-    logic [31:0]      price, shares;
-    logic [63:0]      refNum;
-    eth_udp_if        parserIf(clk250); // same interface as ethernet/udp parser
+    logic               rst, clk250, packetLost, buySell;
+    logic [15:0]        locate;
+    logic [31:0]        price, shares;
+    logic [63:0]        refNum;
+    itch_add_output_if  addIf(clk250);
+    itch_del_output_if  delIf(clk250);
+    itch_exec_output_if execIf(clk250);
+    eth_udp_if          parserIf(clk250); // same interface as ethernet/udp parser
+
 
     // Add order
     itchAddOrderType addOrder = '{
@@ -43,8 +47,6 @@ module itch_parse_test;
         execShares : 31'hABCD7684,
         matchNum   : 64'h3BD786555512BED7};
 
-    assign buySellStim = (addOrder.buySell == BUY) ? 1'b1 : 1'b0;
-
 
     ////////////////////////////////////////////
     // Clock gen
@@ -60,14 +62,26 @@ module itch_parse_test;
         .dataIn(parserIf.data),
         .dataValidIn(parserIf.dataValid),
         .packetLostIn(packetLost),
-        .addValidOut(addValid),
-        .delValidOut(delValid),
-        .execValidOut(execValid),
+        .addValidOut(addIf.valid),
+        .delValidOut(delIf.valid),
+        .execValidOut(execIf.valid),
         .refNumOut(refNum),
         .locateOut(locate),
         .priceOut(price),
         .sharesOut(shares),
         .buySellOut(buySell));
+
+    // Interfaces
+    assign addIf.refNum  = refNum;
+    assign addIf.locate  = locate;
+    assign addIf.buySell = buySell;
+    assign addIf.shares  = shares;
+    assign addIf.price   = price;
+    assign delIf.refNum  = refNum;
+    assign delIf.locate  = locate;
+    assign execIf.refNum = refNum;
+    assign execIf.locate = locate;
+
 
     ////////////////////////////////////////////
     // Stimulus
@@ -90,9 +104,22 @@ module itch_parse_test;
             send_itch_exec_order(parserIf, execOrder);
         end
 
+        // Inter-Packet Gap
         @(posedge parserIf.clk);
         parserIf.dataValid = 1'b0;
-        #96; // Inter-Packet Gap
+        #96;
+
+        for (int i = 0; i < 22; i++) begin
+            // 86 bytes total
+            send_itch_order(parserIf, addOrder);
+            send_itch_del_order(parserIf, delOrder);
+            send_itch_exec_order(parserIf, execOrder);
+        end
+
+        // Inter-Packet Gap
+        @(posedge parserIf.clk);
+        parserIf.dataValid = 1'b0;
+        #96;
 
         for (int i = 0; i < 22; i++) begin
             // 86 bytes total
@@ -103,91 +130,26 @@ module itch_parse_test;
 
         @(posedge parserIf.clk);
         parserIf.dataValid = 1'b0;
-        #96; // Inter-Packet Gap
-
-        for (int i = 0; i < 22; i++) begin
-            // 86 bytes total
-            send_itch_order(parserIf, addOrder);
-            send_itch_del_order(parserIf, delOrder);
-            send_itch_exec_order(parserIf, execOrder);
-        end
-
-        @(posedge parserIf.clk);
-        parserIf.dataValid = 1'b0;
-        #96; // Inter-Packet Gap
     end
 
     ////////////////////////////////////////////
     // Output check
     ////////////////////////////////////////////
     initial begin : check_output
-        for (int i = 0; i < 22; i++) begin
-            @(posedge addValid);
-            assert((delValid|execValid) != 1'b1) else $fatal ("Delete valid or execute valid asserted unexpectedly");
-            assert(locate  == addOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", locate,  addOrder.locate);
-            assert(refNum  == addOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  addOrder.refNum);
-            assert(buySell == buySellStim)       else $fatal ("Incorrect buySell received: %H Expected: %H", buySell, addOrder.buySell);
-            assert(shares  == addOrder.shares)   else $fatal ("Incorrect shares received : %H Expected: %H", shares,  addOrder.shares);
-            assert(price   == addOrder.price)    else $fatal ("Incorrect price received  : %H Expected: %H", price,   addOrder.price);
-            $display("Add order: ", i, " passed.");
+        for (int i = 0; i < 3; i++) begin
+            for (int j = 0; j < 22; j++) begin
+                check_itch_add(addIf, addOrder);
+                assert((delIf.valid|execIf.valid) != 1'b1) else $fatal ("Delete valid or execute valid asserted unexpectedly");
+                $display("Add order: ", i, " ", j, " passed.");
 
-            @(posedge delValid);
-            assert((addValid|execValid) != 1'b1) else $fatal ("Add valid or execute valid asserted unexpectedly");
-            assert(locate  == delOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", locate,  delOrder.locate);
-            assert(refNum  == delOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  delOrder.refNum);
-            $display("Delete order: ", i, " passed.");
+                check_itch_del(delIf, delOrder);
+                assert((addIf.valid|execIf.valid) != 1'b1) else $fatal ("Add valid or execute valid asserted unexpectedly");
+                $display("Delete order: ", i, " ", j, " passed.");
 
-            @(posedge execValid);
-            assert((addValid|delValid) != 1'b1)  else $fatal ("Add valid or delete valid asserted unexpectedly");
-            assert(locate  == execOrder.locate)  else $fatal ("Incorrect locate received : %H Expected: %H", locate,  execOrder.locate);
-            assert(refNum  == execOrder.refNum)  else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  execOrder.refNum);
-            $display("Execute order: ", i, " passed.");
-        end
-
-        for (int i = 0; i < 22; i++) begin
-            @(posedge addValid);
-            assert((delValid|execValid) != 1'b1) else $fatal ("Delete valid or execute valid asserted unexpectedly");
-            assert(locate  == addOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", locate,  addOrder.locate);
-            assert(refNum  == addOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  addOrder.refNum);
-            assert(buySell == buySellStim)       else $fatal ("Incorrect buySell received: %H Expected: %H", buySell, addOrder.buySell);
-            assert(shares  == addOrder.shares)   else $fatal ("Incorrect shares received : %H Expected: %H", shares,  addOrder.shares);
-            assert(price   == addOrder.price)    else $fatal ("Incorrect price received  : %H Expected: %H", price,   addOrder.price);
-            $display("Add order: ", i, " passed.");
-
-            @(posedge delValid);
-            assert((addValid|execValid) != 1'b1) else $fatal ("Add valid or execute valid asserted unexpectedly");
-            assert(locate  == delOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", locate,  delOrder.locate);
-            assert(refNum  == delOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  delOrder.refNum);
-            $display("Delete order: ", i, " passed.");
-
-            @(posedge execValid);
-            assert((addValid|delValid) != 1'b1)  else $fatal ("Add valid or delete valid asserted unexpectedly");
-            assert(locate  == execOrder.locate)  else $fatal ("Incorrect locate received : %H Expected: %H", locate,  execOrder.locate);
-            assert(refNum  == execOrder.refNum)  else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  execOrder.refNum);
-            $display("Execute order: ", i, " passed.");
-        end
-
-        for (int i = 0; i < 22; i++) begin
-            @(posedge addValid);
-            assert((delValid|execValid) != 1'b1) else $fatal ("Delete valid or execute valid asserted unexpectedly");
-            assert(locate  == addOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", locate,  addOrder.locate);
-            assert(refNum  == addOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  addOrder.refNum);
-            assert(buySell == buySellStim)       else $fatal ("Incorrect buySell received: %H Expected: %H", buySell, addOrder.buySell);
-            assert(shares  == addOrder.shares)   else $fatal ("Incorrect shares received : %H Expected: %H", shares,  addOrder.shares);
-            assert(price   == addOrder.price)    else $fatal ("Incorrect price received  : %H Expected: %H", price,   addOrder.price);
-            $display("Add order: ", i, " passed.");
-
-            @(posedge delValid);
-            assert((addValid|execValid) != 1'b1) else $fatal ("Add valid or execute valid asserted unexpectedly");
-            assert(locate  == delOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", locate,  delOrder.locate);
-            assert(refNum  == delOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  delOrder.refNum);
-            $display("Delete order: ", i, " passed.");
-
-            @(posedge execValid);
-            assert((addValid|delValid) != 1'b1)  else $fatal ("Add valid or delete valid asserted unexpectedly");
-            assert(locate  == execOrder.locate)  else $fatal ("Incorrect locate received : %H Expected: %H", locate,  execOrder.locate);
-            assert(refNum  == execOrder.refNum)  else $fatal ("Incorrect refNum received : %H Expected: %H", refNum,  execOrder.refNum);
-            $display("Execute order: ", i, " passed.");
+                check_itch_exec(execIf, execOrder);
+                assert((addIf.valid|delIf.valid) != 1'b1)  else $fatal ("Add valid or delete valid asserted unexpectedly");
+                $display("Execute order: ", i, " ", j, " passed.");
+            end
         end
 
         #20;

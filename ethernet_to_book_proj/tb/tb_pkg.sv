@@ -310,6 +310,39 @@ package tb_pkg;
         end
     endtask
 
+    task check_itch_add (
+        virtual itch_add_output_if addIf,
+        input itchAddOrderType addOrder);
+
+        logic buySellStim;
+
+        @(posedge addIf.valid);
+        assert(addIf.locate  == addOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", addIf.locate,  addOrder.locate);
+        assert(addIf.refNum  == addOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", addIf.refNum,  addOrder.refNum);
+        assign buySellStim  = (addOrder.buySell == BUY) ? 1'b1 : 1'b0;
+        assert(addIf.buySell == buySellStim)       else $fatal ("Incorrect buySell received: %H Expected: %H", addIf.buySell, addOrder.buySell);
+        assert(addIf.shares  == addOrder.shares)   else $fatal ("Incorrect shares received : %H Expected: %H", addIf.shares,  addOrder.shares);
+        assert(addIf.price   == addOrder.price)    else $fatal ("Incorrect price received  : %H Expected: %H", addIf.price,   addOrder.price);
+    endtask
+
+    task check_itch_del (
+        virtual itch_del_output_if delIf,
+        input itchDeleteOrderType delOrder);
+
+        @(posedge delIf.valid);
+        assert(delIf.locate  == delOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", delIf.locate,  delOrder.locate);
+        assert(delIf.refNum  == delOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", delIf.refNum,  delOrder.refNum);
+    endtask
+
+    task check_itch_exec (
+        virtual itch_exec_output_if execIf,
+        input itchOrderExecutedType execOrder);
+
+        @(posedge execIf.valid);
+        assert(execIf.locate  == execOrder.locate)   else $fatal ("Incorrect locate received : %H Expected: %H", execIf.locate,  execOrder.locate);
+        assert(execIf.refNum  == execOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", execIf.refNum,  execOrder.refNum);
+    endtask
+
     function automatic logic [15:0] ip_header_chksum_calc (
         input ipHeaderType ipHeader);
 
