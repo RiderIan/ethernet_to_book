@@ -50,3 +50,45 @@ interface rgmii_rx_output_if(input rxClkLcl);
         rxData      = 8'h00;
     endtask
 endinterface
+
+interface itch_add_output_if(input clk);
+    logic        valid;
+    logic [15:0] locate;
+    logic [63:0] refNum;
+    logic        buySell;
+    logic [31:0] shares;
+    logic [31:0] price;
+
+    task automatic reset();
+        valid    = '0;
+        locate   = '0;
+        refNum   = '0;
+        buySell  = '0;
+        shares   = '0;
+        price    = '0;
+    endtask
+endinterface
+
+interface itch_del_output_if(input clk);
+    logic        valid;
+    logic [15:0] locate;
+    logic [63:0] refNum;
+
+    task automatic reset();
+        valid    = '0;
+        locate   = '0;
+        refNum   = '0;
+    endtask
+endinterface
+
+interface itch_exec_output_if(input clk);
+    logic        valid;
+    logic [15:0] locate;
+    logic [63:0] refNum;
+
+    task automatic reset();
+        valid    = '0;
+        locate   = '0;
+        refNum   = '0;
+    endtask
+endinterface
