@@ -22,20 +22,32 @@ module ethernet_to_book_top (
     output logic        txCtrlOut,
     output logic        txClkOut,
 
-    output logic        itchDataValidOut,
-    output logic [7:0 ] itchDataOut,
-    output logic        packetLostOut,
+    output logic        itchDataValidOut, // temp
+    output logic [7:0 ] itchDataOut,      // temp
+    output logic        packetLostOut,    // temp
+
+    output logic        addValidOut,      // temp
+    output logic        delValidOut,      // temp
+    output logic        execValidOut,     // temp
+    output logic [63:0] refNumOut,        // temp
+    output logic [15:0] locateOut,        // temp
+    output logic [31:0] priceOut,         // temp
+    output logic [63:0] sharesOut,        // temp
+    output logic        buySellOut,       // temp
 
     input  logic        intBIn,
     output logic        phyRstBOut,
     output logic        lockedOut);
 
     // Signals
-    logic       rstTxLcl,    rstTx,       rst250, rstRxLcl;
-    logic       txClkLcl,    rxClkLcl,    clk250;
-    logic       mmcm0Locked, mmcm1Locked;
-    logic [7:0] rxData,      rx250Data, itchData;
-    logic       rxDataValid, rdDataValid, itchValid;
+    logic        rstTxLcl,    rstTx,       rst250, rstRxLcl;
+    logic        txClkLcl,    rxClkLcl,    clk250;
+    logic        mmcm0Locked, mmcm1Locked;
+    logic [ 7:0] rxData,      rx250Data, itchData;
+    logic        rxDataValid, rdDataValid, itchValid, packetLost, addValid, delValid, execValid, buySell;
+    logic [15:0] locate;
+    logic [31:0] price;
+    logic [63:0] refNum, shares;
 
     ////////////////////////////////////////////
     // Clocks and Resets
@@ -100,7 +112,24 @@ module ethernet_to_book_top (
         .dataValidIn(rdDataValid),
         .itchDataValidOut(itchValid),
         .itchDataOut(itchData),
-        .packetLostOut(packetLostOut));
+        .packetLostOut(packetLost));
+
+    assign packetLostOut = packetLost;
+
+    itch_parser itch_parser_inst (
+        .rstIn(rst250),
+        .clkIn(clk250),
+        .dataIn(itchData),
+        .dataValidIn(itchValid),
+        .packetLostIn(packetLost),
+        .addValidOut(addValid),
+        .delValidOut(delValid),
+        .execValidOut(execValid),
+        .refNumOut(refNum),
+        .locateOut(locate),
+        .priceOut(price),
+        .sharesOut(shares),
+        .buySellOut(buySell));
 
     ////////////////////////////////////////////
     // Outputs
@@ -108,8 +137,16 @@ module ethernet_to_book_top (
     assign phyRstBOut       = rstTx; // may want more logic driving this
     assign lockedOut        = mmcm0Locked & mmcm1Locked;
 
-    // Temporary to prevent synth optimization
+    // Temporary to prevent synth optimization and for full system sims
     assign itchDataValidOut = itchValid;
     assign itchDataOut      = itchData;
+    assign addValidOut      = addValid;
+    assign delValidOut      = delValid;
+    assign execValidOut     = execValid;
+    assign refNumOut        = refNum;
+    assign locateOut        = locate;
+    assign priceOut         = price;
+    assign sharesOut        = shares;
+    assign buySellOut       = buySell;
 
 endmodule

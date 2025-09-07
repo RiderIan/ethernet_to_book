@@ -12,7 +12,7 @@ package pkg;
     // ITCH
     const logic [ 7:0] ADD_MSG_TYPE      =  8'h41;               // "A" ascii
     const logic [ 7:0] EXECUTED_MSG_TYPE =  8'h45;               // "E" ascii
-    const logic [ 7:0] CANCEL_MSG_TYPE   =  8'h58;               // "X" ascii
+    const logic [ 7:0] DELETE_MSG_TYPE   =  8'h44;               // "D" ascii
     const logic [ 7:0] BUY               =  8'h42;               // "B" ascii
     const logic [ 7:0] SELL              =  8'h53;               // "S" ascii
     const logic [63:0] AAPL              = 64'h4141504C00000000; // "APPL" ascii -> APPLE symbol
@@ -102,6 +102,8 @@ package pkg;
         logic [15:0] trackNum;
         logic [47:0] timeStamp;
         logic [63:0] refNum;
+        logic [31:0] execShares;
+        logic [63:0] matchNum;
     } itchOrderExecutedType;
 
 
