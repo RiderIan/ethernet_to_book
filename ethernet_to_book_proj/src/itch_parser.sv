@@ -37,9 +37,9 @@ module itch_parser (
     const logic [10:0] PRICE_DONE       = 10'd36;
 
 
-    logic        addTypeR, addValidR, delTypeR, delValidR, execTypeR, execValidR, msgDone, buySellR;
+    logic        addTypeR, addValidR, delTypeR, delValidR, execTypeR, execValidR, msgDone;
     logic        addTypeStickyR, delTypeStickyR, execTypeStickyR, dataValidFallingR, dataValidR;
-    logic [10:0] byteCntR, msgTypeOffsetR, msgTypeOffsetNext, locateOffsetR, refNumOffsetR, refNumEndR, matchNumEndR;
+    logic [10:0] byteCntR, byteCntRR, msgTypeOffsetR, msgTypeOffsetNext, locateOffsetR, refNumOffsetR, refNumEndR, matchNumEndR;
     logic [10:0] buySellOffsetR, sharesOffsetR, priceOffsetR, priceEndR;
     logic [15:0] locateR;
     logic [31:0] priceR, sharesR;
@@ -110,7 +110,8 @@ module itch_parser (
     // Shares
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : shares_capture
-        if (dataValidIn & (byteCntR < SHARES_DONE))
+        byteCntRR <= byteCntR;
+        if (dataValidIn & (byteCntRR < sharesOffsetR))
             sharesR <= (sharesR << 8) | dataIn;
     end
 
@@ -182,7 +183,7 @@ module itch_parser (
             refNumEndR        <= REF_NUM_DONE   - 1;
             matchNumEndR      <= MATCH_NUM_DONE - 1;
             buySellOffsetR    <= BUY_SELL_DONE  - 1;
-            sharesOffsetR     <= SHARES_DONE;
+            sharesOffsetR     <= SHARES_DONE    - 1;
             priceOffsetR      <= PRICE_DONE;
             priceEndR         <= PRICE_DONE     - 1;
             dataValidFallingR <= 1'b0;
@@ -202,6 +203,7 @@ module itch_parser (
                 refNumEndR     <= byteCntR + REF_NUM_DONE   - 1;
                 matchNumEndR   <= byteCntR + MATCH_NUM_DONE - 1;
                 buySellOffsetR <= byteCntR + BUY_SELL_DONE  - 1;
+                sharesOffsetR  <= byteCntR + SHARES_DONE    - 1;
                 priceOffsetR   <= byteCntR + PRICE_DONE;
                 priceEndR      <= byteCntR + PRICE_DONE     - 1;
             end
@@ -212,7 +214,7 @@ module itch_parser (
                 refNumEndR        <= REF_NUM_DONE   - 1;
                 matchNumEndR      <= MATCH_NUM_DONE - 1;
                 buySellOffsetR    <= BUY_SELL_DONE  - 1;
-                sharesOffsetR     <= SHARES_DONE;
+                sharesOffsetR     <= SHARES_DONE    - 1;
                 priceOffsetR      <= PRICE_DONE;
                 priceEndR         <= PRICE_DONE     - 1;
             end
@@ -224,7 +226,6 @@ module itch_parser (
     assign execValidOut = execValidR;
     assign locateOut    = locateR;
     assign refNumOut    = refNumR;
-    assign buySellOut   = buySellR;
     assign sharesOut    = sharesR;
     assign priceOut     = priceR;
 
