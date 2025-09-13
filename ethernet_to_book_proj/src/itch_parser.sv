@@ -39,8 +39,7 @@ module itch_parser (
 
     logic        addTypeR, addValidR, delTypeR, delValidR, execTypeR, execValidR, msgDone;
     logic        addTypeStickyR, delTypeStickyR, execTypeStickyR, dataValidFallingR, dataValidR;
-    logic [10:0] byteCntR, byteCntRR, msgTypeOffsetR, msgTypeOffsetNext, locateOffsetR, refNumOffsetR, refNumEndR, matchNumEndR;
-    logic [10:0] buySellOffsetR, sharesOffsetR, priceOffsetR, priceEndR;
+    logic [10:0] byteCntR, byteCntRR;
     logic [15:0] locateR;
     logic [31:0] priceR, sharesR;
     logic [63:0] refNumR;
@@ -54,7 +53,7 @@ module itch_parser (
             delTypeR  <= 1'b0;
             execTypeR <= 1'b0;
         end else begin
-            if (dataValidIn & (byteCntR == msgTypeOffsetR)) begin
+            if (dataValidIn & (byteCntR == 0)) begin
                 if (dataIn == ADD_MSG_TYPE)
                     addTypeR  <= 1'b1;
                 else
@@ -77,7 +76,7 @@ module itch_parser (
     // Locate
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : locate_capture
-        if (dataValidIn & (byteCntR < locateOffsetR)) begin
+        if (dataValidIn & (byteCntR < LOCATE_DONE)) begin
             locateR <= (locateR << 8) | dataIn;
         end
     end
@@ -86,7 +85,7 @@ module itch_parser (
     // Reference number
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : ref_num_capture
-        if (dataValidIn & (byteCntR < refNumOffsetR)) begin
+        if (dataValidIn & (byteCntR < REF_NUM_DONE)) begin
             refNumR <= (refNumR << 8) | dataIn;
         end
     end
@@ -97,7 +96,7 @@ module itch_parser (
     always_ff @(posedge clkIn) begin : buy_sell_capture
         // No reset becuase both '0' and '1' are valid states
         // Might not be the most safe way to do this
-        if (dataValidIn & (byteCntR == buySellOffsetR)) begin
+        if (dataValidIn & (byteCntR == BUY_SELL_DONE  - 1)) begin
             if (dataIn == BUY) begin
                 buySellOut  <= 1'b1;
             end else if (dataIn == SELL) begin
@@ -111,7 +110,7 @@ module itch_parser (
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : shares_capture
         byteCntRR <= byteCntR;
-        if (dataValidIn & (byteCntRR < sharesOffsetR))
+        if (dataValidIn & (byteCntRR < SHARES_DONE))
             sharesR <= (sharesR << 8) | dataIn;
     end
 
@@ -119,7 +118,7 @@ module itch_parser (
     // Price
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : price_capture
-        if (dataValidIn & (byteCntR < priceOffsetR))
+        if (dataValidIn & (byteCntR < PRICE_DONE))
             priceR <= (priceR << 8) | dataIn;
     end
 
@@ -132,92 +131,57 @@ module itch_parser (
             delValidR      <= 1'b0;
             execValidR     <= 1'b0;
             msgDone        <= 1'b0;
-            msgTypeOffsetR <= MSG_TYPE_DONE - 1;
         end else begin
             addValidR      <= 1'b0;
             delValidR      <= 1'b0;
             execValidR     <= 1'b0;
             msgDone        <= 1'b0;
 
+            addValidR      <= msgDone ? addTypeR  : 1'b0;
+            delValidR      <= msgDone ? delTypeR  : 1'b0;
+
             case (byteCntR)
-                priceEndR : begin
-                    if (addTypeR) begin
-                        msgTypeOffsetR <= msgTypeOffsetNext;
-                        addValidR      <= 1'b1;
-                        msgDone        <= 1'b1;
+                (PRICE_DONE - 1) : begin
+                    if (addTypeR & ~msgDone) begin
+                        msgDone <= 1'b1;
                     end
                 end
 
-                refNumEndR : begin
-                    if (delTypeR) begin
-                        msgTypeOffsetR <= msgTypeOffsetNext;
-                        delValidR      <= 1'b1;
-                        msgDone        <= 1'b1;
+                (REF_NUM_DONE - 1) : begin
+                    if (delTypeR & ~msgDone) begin
+                        msgDone <= 1'b1;
                     end
                 end
 
-                matchNumEndR : begin
-                    if (execTypeR) begin
-                        msgTypeOffsetR <= msgTypeOffsetNext;
-                        execValidR     <= 1'b1;
-                        msgDone        <= 1'b1;
+                // Execute valid asserts before exec shares and match number
+                // If executed shares is implement this will need to be bumped up to that
+                REF_NUM_DONE : begin
+                    if (execTypeR & ~execValidR) begin
+                        execValidR <= 1'b1;
                     end
                 end
+
+                (MATCH_NUM_DONE - 1) : begin
+                    if (execTypeR & ~msgDone) begin
+                        msgDone <= 1'b1;
+                    end
+                end
+
             endcase
-
-            if (dataValidFallingR)
-                msgTypeOffsetR <= MSG_TYPE_DONE - 1;
         end
     end
-
-    assign msgTypeOffsetNext = byteCntR + MSG_TYPE_DONE;
 
     ////////////////////////////////////////////
     // Byte cnt of current frame
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin
         if (rstIn) begin
-            byteCntR          <= 0;
-            locateOffsetR     <= LOCATE_DONE;
-            refNumOffsetR     <= REF_NUM_DONE;
-            refNumEndR        <= REF_NUM_DONE   - 1;
-            matchNumEndR      <= MATCH_NUM_DONE - 1;
-            buySellOffsetR    <= BUY_SELL_DONE  - 1;
-            sharesOffsetR     <= SHARES_DONE    - 1;
-            priceOffsetR      <= PRICE_DONE;
-            priceEndR         <= PRICE_DONE     - 1;
-            dataValidFallingR <= 1'b0;
-            dataValidR        <= 1'b0;
+            byteCntR <= '0;
         end else begin
-            if (dataValidIn)
-                byteCntR       <= byteCntR + 1;
-            else if (dataValidFallingR)
-                byteCntR       <= '0;
-
-            dataValidR         <= dataValidIn;
-            dataValidFallingR  <= dataValidR & ~dataValidIn;
-
-            if (msgDone) begin
-                locateOffsetR  <= byteCntR + LOCATE_DONE;
-                refNumOffsetR  <= byteCntR + REF_NUM_DONE;
-                refNumEndR     <= byteCntR + REF_NUM_DONE   - 1;
-                matchNumEndR   <= byteCntR + MATCH_NUM_DONE - 1;
-                buySellOffsetR <= byteCntR + BUY_SELL_DONE  - 1;
-                sharesOffsetR  <= byteCntR + SHARES_DONE    - 1;
-                priceOffsetR   <= byteCntR + PRICE_DONE;
-                priceEndR      <= byteCntR + PRICE_DONE     - 1;
-            end
-
-            if (dataValidFallingR) begin
-                locateOffsetR     <= LOCATE_DONE;
-                refNumOffsetR     <= REF_NUM_DONE;
-                refNumEndR        <= REF_NUM_DONE   - 1;
-                matchNumEndR      <= MATCH_NUM_DONE - 1;
-                buySellOffsetR    <= BUY_SELL_DONE  - 1;
-                sharesOffsetR     <= SHARES_DONE    - 1;
-                priceOffsetR      <= PRICE_DONE;
-                priceEndR         <= PRICE_DONE     - 1;
-            end
+            if (msgDone)
+                byteCntR <= '0;
+            else if (dataValidIn)
+                byteCntR <= byteCntR + 1;
         end
     end
 

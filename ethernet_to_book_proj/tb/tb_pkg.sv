@@ -205,7 +205,7 @@ package tb_pkg;
         input itchAddOrderType itchData);
 
         begin
-            $display("--- SENDING ITCH ORDER ---");
+            $display("--- SENDING ITCH ADD ORDER ---");
             $display("Message type:           0x%H", itchData.msgType);
             $display("Stock locate:           0x%H", itchData.locate);
             $display("Tracking number:        0x%H", itchData.trackNum);
@@ -217,6 +217,45 @@ package tb_pkg;
             $display("Price:                  0x%H", itchData.price);
 
             for (int i = 0; i < 36; i++) begin
+                send_rgmii_byte(rxIf, itchData.msgType);
+                itchData = itchData << 8;
+            end
+        end
+    endtask;
+
+    task send_itch_delete_rgmii (
+        virtual rgmii_rx_if rxIf,
+        input itchDeleteOrderType itchData);
+
+        begin
+            $display("--- SENDING ITCH DELETE ORDER ---");
+            $display("Message type:           0x%H", itchData.msgType);
+            $display("Stock locate:           0x%H", itchData.locate);
+            $display("Tracking number:        0x%H", itchData.trackNum);
+            $display("Timestamp:              0x%H", itchData.timeStamp);
+            $display("Order reference number: 0x%H", itchData.refNum);
+            for (int i = 0; i < 19; i++) begin
+                send_rgmii_byte(rxIf, itchData.msgType);
+                itchData = itchData << 8;
+            end
+        end
+    endtask;
+
+    task send_itch_execute_rgmii (
+        virtual rgmii_rx_if rxIf,
+        input itchOrderExecutedType itchData);
+
+        begin
+            $display("--- SENDING ITCH EXECUTE ORDER ---");
+            $display("Message type:           0x%H", itchData.msgType);
+            $display("Stock locate:           0x%H", itchData.locate);
+            $display("Tracking number:        0x%H", itchData.trackNum);
+            $display("Timestamp:              0x%H", itchData.timeStamp);
+            $display("Order reference number: 0x%H", itchData.refNum);
+            $display("Executed shares:        0x%H", itchData.execShares);
+            $display("Match number:           0x%H", itchData.matchNum);
+
+            for (int i = 0; i < 31; i++) begin
                 send_rgmii_byte(rxIf, itchData.msgType);
                 itchData = itchData << 8;
             end
@@ -241,6 +280,8 @@ package tb_pkg;
 
             for (int i = 0; i < 36; i++) begin
                 send_eth_udp_byte(parserIf, itchData.msgType);
+                @(posedge parserIf.clk);
+                parserIf.dataValid = 1'b0;
                 itchData = itchData << 8;
             end
         end
@@ -260,6 +301,8 @@ package tb_pkg;
 
             for (int i = 0; i < 19; i++) begin
                 send_eth_udp_byte(parserIf, itchData.msgType);
+                @(posedge parserIf.clk);
+                parserIf.dataValid = 1'b0;
                 itchData = itchData << 8;
             end
         end
@@ -281,6 +324,8 @@ package tb_pkg;
 
             for (int i = 0; i < 31; i++) begin
                 send_eth_udp_byte(parserIf, itchData.msgType);
+                @(posedge parserIf.clk);
+                parserIf.dataValid = 1'b0;
                 itchData = itchData << 8;
             end
         end
