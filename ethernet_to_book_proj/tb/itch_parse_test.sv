@@ -29,6 +29,7 @@ module itch_parse_test;
         shares     : 32'h00000045,
         stock      : AAPL,
         price      : 32'h0022FEFC}; // Price in $0.0001 increments, this is $229.3500 for example
+
     // Delete order
     itchDeleteOrderType delOrder = '{
         msgType    : DELETE_MSG_TYPE,

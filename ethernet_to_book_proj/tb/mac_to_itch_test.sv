@@ -1,11 +1,11 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Dev:     Ian Rider
-// Purpose: Verify MAC through ethernet parser
+// Purpose: Verify full MAC to ITCH parser path
 //////////////////////////////////////////////////////////////////////////////////
 import tb_pkg::*;
 
-module mac_to_parse_test;
+module mac_to_itch_test;
 
     const int         CLK_250_MHZ_PERIOD = 4;
     const int         ETH_HEADER_LEN     = 14; // Not included in IP length
@@ -13,27 +13,51 @@ module mac_to_parse_test;
     const int         UDP_HEADER_LEN     = 8;
     const int         MOLD_HEADER_LEN    = 20;
 
-    logic rst, clk100, rxClk, txClk, txCtrl, intB, phyRstB, locked, clk250, packetLostDet;
+    logic rst, clk100, rxClk, txClk, txCtrl, intB, phyRstB, locked, clk250, packetLostDet, buySell;
     logic [ 3:0] txData;
     logic [ 7:0] itchData;
     logic [15:0] ipChkSum;
+    logic [15:0] locate;
+    logic [31:0] price, shares;
+    logic [63:0] refNum;
 
-    rgmii_rx_if       rxIf(rxClk);
-    eth_udp_output_if parserOutIf(clk250);
+    rgmii_rx_if         rxIf(rxClk);
+    itch_add_output_if  addIf(clk250);
+    itch_del_output_if  delIf(clk250);
+    itch_exec_output_if execIf(clk250);
+    eth_udp_output_if   parserOutIf(clk250);
 
-    // ITCH Data
-    itchAddOrderType itchOrder = '{
+    // Add order
+    itchAddOrderType addOrder = '{
         msgType    : ADD_MSG_TYPE,
         locate     : 16'hBE42,      // Changes everyday, used for rapid book lookup
         trackNum   : 16'h0001,
-        timeStamp  : 48'h000000000000,
+        timeStamp  : 48'h000000000455,
         refNum     : 64'hDEFB1673DEFB1673,
         buySell    : BUY,
         shares     : 32'h00000045,
         stock      : AAPL,
         price      : 32'h0022FEFC}; // Price in $0.0001 increments, this is $229.3500 for example
 
-    int ITCH_DATA_LEN      = $bits(itchOrder)/8;
+    // Delete order
+    itchDeleteOrderType delOrder = '{
+        msgType    : DELETE_MSG_TYPE,
+        locate     : 16'hBE42,
+        trackNum   : 16'h3021,
+        timeStamp  : 48'h000000003DE1,
+        refNum     : 64'hDEF12373DEFDE89C};
+
+    // Execute order
+    itchOrderExecutedType execOrder = '{
+        msgType    : EXECUTED_MSG_TYPE,
+        locate     : 16'hBE42,
+        trackNum   : 16'h4553,
+        timeStamp  : 48'h000000000101,
+        refNum     : 64'hABCD167ABCDB1005,
+        execShares : 32'hABCD7684,
+        matchNum   : 64'h3BD786555512BED7};
+
+    int ITCH_DATA_LEN      = $bits({addOrder, delOrder, execOrder})/8;
     int IP_V4_TOTAL_LEN    = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN + IP_HEADER_LEN;
     int UDP_LENGTH         = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN;
 
@@ -77,9 +101,29 @@ module mac_to_parse_test;
         .itchDataOut(parserOutIf.data),
         .packetLostOut(parserOutIf.packetLost),
 
+        .addValidOut(addIf.valid),
+        .delValidOut(delIf.valid),
+        .execValidOut(execIf.valid),
+        .refNumOut(refNum),
+        .locateOut(locate),
+        .priceOut(price),
+        .sharesOut(shares),
+        .buySellOut(buySell),
+
         .intBIn(intB),
         .phyRstBOut(phyRstB),
         .lockedOut(locked));
+
+    // Interfaces
+    assign addIf.refNum  = refNum;
+    assign addIf.locate  = locate;
+    assign addIf.buySell = buySell;
+    assign addIf.shares  = shares;
+    assign addIf.price   = price;
+    assign delIf.refNum  = refNum;
+    assign delIf.locate  = locate;
+    assign execIf.refNum = refNum;
+    assign execIf.locate = locate;
 
     ////////////////////////////////////////////
     // Stimulus
@@ -97,8 +141,9 @@ module mac_to_parse_test;
         send_ip_header_rgmii(rxIf, ipHdr);
         send_udp_header_rgmii(rxIf, udpHdr);
         send_mold_header_rgmii(rxIf, moldHdr);
-        // Send an add order
-        send_itch_order_rgmii(rxIf, itchOrder);
+        send_itch_order_rgmii(rxIf, addOrder);
+        send_itch_delete_rgmii(rxIf, delOrder);
+        send_itch_execute_rgmii(rxIf, execOrder);
         @(posedge rxIf.clk);
         rxIf.ctrl = 1'b0;
 
@@ -112,8 +157,9 @@ module mac_to_parse_test;
         send_ip_header_rgmii(rxIf, ipHdr);
         send_udp_header_rgmii(rxIf, udpHdr);
         send_mold_header_rgmii(rxIf, moldHdr);
-        // Send an add order
-        send_itch_order_rgmii(rxIf, itchOrder);
+        send_itch_order_rgmii(rxIf, addOrder);
+        send_itch_delete_rgmii(rxIf, delOrder);
+        send_itch_execute_rgmii(rxIf, execOrder);
         @(posedge rxIf.clk);
         rxIf.ctrl = 1'b0;
     end
@@ -125,35 +171,30 @@ module mac_to_parse_test;
     ////////////////////////////////////////////
     // Output check
     ////////////////////////////////////////////
-    initial begin : frame_check_proc
+    initial begin : check_output
+        check_itch_add(addIf, addOrder);
+        assert((delIf.valid|execIf.valid) != 1'b1) else $fatal ("Delete valid or execute valid asserted unexpectedly");
+        $display("Add order passed.");
 
-        for (int i = 0; i < ($bits(itchOrder)/8); i++) begin
-            check_eth_udp_byte(parserOutIf, itchOrder.msgType);
-            itchOrder = itchOrder << 8;
-        end
+        check_itch_del(delIf, delOrder);
+        assert((addIf.valid|execIf.valid) != 1'b1) else $fatal ("Add valid or execute valid asserted unexpectedly");
+        $display("Delete order passed.");
 
-        #8
-        assert(parserOutIf.dataValid == 1'b0) else $fatal ("Valid failed to de-assert :(");
+        check_itch_exec(execIf, execOrder);
+        assert((addIf.valid|delIf.valid) != 1'b1) else $fatal ("Add valid or delete valid asserted unexpectedly");
+        $display("Execute order passed.");
 
-        itchOrder = '{
-            msgType    : ADD_MSG_TYPE,
-            locate     : 16'hBE42,
-            trackNum   : 16'h0005,
-            timeStamp  : 48'h000000000123,
-            refNum     : 64'h111B1673DEFB4321,
-            buySell    : SELL,
-            shares     : 32'h00000184,
-            stock      : AAPL,
-            price      : 32'h0021FEFC};
+        check_itch_add(addIf, addOrder);
+        assert((delIf.valid|execIf.valid) != 1'b1) else $fatal ("Delete valid or execute valid asserted unexpectedly");
+        $display("Add order passed.");
 
-        for (int i = 0; i < ($bits(itchOrder)/8); i++) begin
-            check_eth_udp_byte(parserOutIf, itchOrder.msgType);
-            itchOrder = itchOrder << 8;
-        end
+        check_itch_del(delIf, delOrder);
+        assert((addIf.valid|execIf.valid) != 1'b1) else $fatal ("Add valid or execute valid asserted unexpectedly");
+        $display("Delete order passed.");
 
-        #8
-        assert(packetLostDet == 1'b1)         else $fatal ("Packet loss was not detected :(");
-        assert(parserOutIf.dataValid == 1'b0) else $fatal ("Valid failed to de-assert :(");
+        check_itch_exec(execIf, execOrder);
+        assert((addIf.valid|delIf.valid) != 1'b1) else $fatal ("Add valid or delete valid asserted unexpectedly");
+        $display("Execute order passed.");
 
         #20;
         $display(" --- TEST PASSED ---");

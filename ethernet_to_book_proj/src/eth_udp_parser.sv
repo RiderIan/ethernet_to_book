@@ -26,10 +26,10 @@ module eth_udp_parser (
     const logic [10:0] MOLD_HDR_DONE = 11'd64;
 
     logic [10:0] byteCntR;
-    logic [ 7:0] dataR;
+    logic [15:0] twoBytesR;
     logic [16:0] ipChkSumAccumR;
     logic dstMacCheckR, ipV4CheckR, ipV6CheckR;
-    logic ipVerCheckR, protocolCheckR, nyseIpCheckR, ipChkSumPassR, ipPackTwoBytesR, ipTogglePulseR;
+    logic ipVerCheckR, protocolCheckR, nyseIpCheckR, ipChkSumPassR, ipToggleTwoBytesR, ipPulseTwoBytesR;
     logic udpDstCheckR, passItch;
     logic moldDoneR;
     logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR;
@@ -38,7 +38,7 @@ module eth_udp_parser (
     logic [31:0] currSeqNumR;
 
     (* shreg_extract = "no" *) logic [15:0] udpLenR, udpLenRR, udpLenRRR;
-    (* shreg_extract = "no" *) logic [15:0] ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR, chkSumDataR;
+    (* shreg_extract = "no" *) logic [15:0] ipV6LenR, ipV6LenRR, ipV6LenRRR, onesCompSumR;
 
     ////////////////////////////////////////////
     // Ethernet header
@@ -82,34 +82,31 @@ module eth_udp_parser (
 
     always_ff @(posedge clkIn) begin : ip_header_capture
         if (rstIn) begin
-            ipHeaderR       <= '0;
-            ipPackTwoBytesR <= '0;
-            ipTogglePulseR  <= '0;
-            ipChkSumAccumR  <= '0;
-            onesCompSumR    <= '0;
-            dataR           <= '0;
-            // chkSumDataR     <= '0;
+            ipHeaderR         <= '0;
+            ipToggleTwoBytesR <= '0;
+            ipPulseTwoBytesR  <= '0;
+            ipChkSumAccumR    <= '0;
+            onesCompSumR      <= '0;
+            twoBytesR         <= '0;
         end else begin
             // Capture
-            ipPackTwoBytesR <= 1'b0;
+            ipPulseTwoBytesR <= 1'b0;
             if (dataValidIn & (byteCntR < IP_HDR_DONE)) begin
-                ipHeaderR       <= (ipHeaderR << 8) | dataIn;
-                dataR           <= dataIn;
-                ipTogglePulseR  <= ~ipTogglePulseR;
-                if (ipTogglePulseR)
-                    ipPackTwoBytesR <= 1'b1;
-            end else if (endOfFrameDetR) begin
-                dataR           <= '0;
+                ipHeaderR         <= (ipHeaderR << 8) | dataIn;
+                twoBytesR         <= (twoBytesR << 8) | dataIn;
+                ipToggleTwoBytesR <= ~ipToggleTwoBytesR;
+
+                if (ipToggleTwoBytesR )
+                    ipPulseTwoBytesR <= 1'b1;
             end
 
-            // Checksum
-            if (ipPackTwoBytesR & (byteCntR < IP_HDR_DONE) & (byteCntR >= ETH_HDR_DONE)) begin
-                ipChkSumAccumR <= ipChkSumAccumR + {dataR, dataIn};
-                onesCompSumR   <= ~(ipChkSumAccumR[15:0] + ipChkSumAccumR[16]);
+            if (ipPulseTwoBytesR & (byteCntR > ETH_HDR_DONE) & (byteCntR < IP_HDR_DONE + 2)) begin
+                ipChkSumAccumR <= ipChkSumAccumR + twoBytesR;
             end else if (endOfFrameDetR) begin
                 ipChkSumAccumR <= '0;
-                onesCompSumR   <= '0;
             end
+
+            onesCompSumR   <= ~(ipChkSumAccumR[15:0] + ipChkSumAccumR[16]);
         end
     end
 
