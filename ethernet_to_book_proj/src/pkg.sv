@@ -106,6 +106,12 @@ package pkg;
         logic [63:0] matchNum;
     } itchOrderExecutedType;
 
+    typedef struct packed {
+        logic [31:0] price;
+        logic [31:0] shares;
+        logic        buySell;
+    } orderDataType;
+
 
     virtual class grayBin #(int WIDTH);
         static function automatic logic [WIDTH-1:0] bin2gray (input logic [WIDTH-1:0] bin);
