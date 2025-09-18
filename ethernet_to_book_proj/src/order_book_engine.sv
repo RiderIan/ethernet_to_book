@@ -25,6 +25,9 @@ module order_book_engine # (
     input  logic [31:0] sharesIn,
     input  logic        buySellIn,
 
+    output bookLevelType topBuyOut,
+    output bookLevelType topSellOut,
+
     output orderDataType orderDataOut, // temp
     output logic [64:0]  refDataOut);  // temp
 
@@ -73,7 +76,9 @@ module order_book_engine # (
         .mapLocateIn(locate),
         .mapPriceIn(price),
         .mapSharesIn(shares),
-        .mapBuySellIn(buySell));
+        .mapBuySellIn(buySell),
+        .topBuyOut(topBuyOut),
+        .topSellOut(topSellOut));
 
 
 

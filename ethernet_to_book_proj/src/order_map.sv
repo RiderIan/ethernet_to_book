@@ -6,6 +6,14 @@
 //////////////////////////////////////////////////////////////////////////////////
 import pkg::*;
 
+////////////////////////////////////////////
+// IN PROGRESS
+////////////////////////////////////////////
+
+////////////////////////////////////////////
+// IN PROGRESS
+////////////////////////////////////////////
+
 module order_map # (
     // Must be power of two
     // max 65536 for hash key calc (way too large for Artix 7 anyways
@@ -61,14 +69,14 @@ module order_map # (
         if (wrEnA)
             refNumRamR[addrARR] <= refDataI;
         refDataOR  <= refNumRamR[addrARR];
-        refDataORR <= refDataOR
+        refDataORR <= refDataOR;
     end
 
     always_ff @(posedge clkIn) begin : order_info_ram_a
         if (wrEnA)
             orderInfoRamR[addrARR] <= orderDataI;
         orderDataOR  <= orderInfoRamR[addrARR];
-        orderDataORR <= orderDataOR
+        orderDataORR <= orderDataOR;
     end
 
 

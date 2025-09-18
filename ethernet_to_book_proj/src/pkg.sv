@@ -112,6 +112,11 @@ package pkg;
         logic        buySell;
     } orderDataType;
 
+    typedef struct packed {
+        logic [31:0] price;
+        logic [31:0] quantity;
+    } bookLevelType;
+
 
     virtual class grayBin #(int WIDTH);
         static function automatic logic [WIDTH-1:0] bin2gray (input logic [WIDTH-1:0] bin);
