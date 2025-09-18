@@ -9,35 +9,38 @@
 
 module ethernet_to_book_top (
 
-    input  logic        clkIn,
-    input  logic        rstIn,
-    //inout  logic       mdioBi,
-    //output logic       mdClkOut,
+    input  logic         clkIn,
+    input  logic         rstIn,
+    // inout  logic       mdioBi,
+    // output logic       mdClkOut,
 
-    input  logic [3:0]  rxDataIn,
-    input  logic        rxCtrlIn,
-    input  logic        rxClkIn,
+    input  logic [3:0]   rxDataIn,
+    input  logic         rxCtrlIn,
+    input  logic         rxClkIn,
 
-    output logic [3:0]  txDataOut,
-    output logic        txCtrlOut,
-    output logic        txClkOut,
+    output logic [3:0]   txDataOut,
+    output logic         txCtrlOut,
+    output logic         txClkOut,
 
-    output logic        itchDataValidOut, // temp
-    output logic [7:0 ] itchDataOut,      // temp
-    output logic        packetLostOut,    // temp
+    // output logic         itchDataValidOut, // temp
+    // output logic [7:0 ]  itchDataOut,      // temp
+    // output logic         packetLostOut,    // temp
+    // output logic         addValidOut,      // temp
+    // output logic         delValidOut,      // temp
+    // output logic         execValidOut,     // temp
+    // output logic [63:0]  refNumOut,        // temp
+    // output logic [15:0]  locateOut,        // temp
+    // output logic [31:0]  priceOut,         // temp
+    // output logic [63:0]  sharesOut,        // temp
+    // output logic         buySellOut,       // temp
+    output orderDataType orderDataOut,        // temp
+    output logic [64:0]  refDataOut,          // temp
+    output bookLevelType topBuyOut,
+    output bookLevelType topSellOut,
 
-    output logic        addValidOut,      // temp
-    output logic        delValidOut,      // temp
-    output logic        execValidOut,     // temp
-    output logic [63:0] refNumOut,        // temp
-    output logic [15:0] locateOut,        // temp
-    output logic [31:0] priceOut,         // temp
-    output logic [63:0] sharesOut,        // temp
-    output logic        buySellOut,       // temp
-
-    input  logic        intBIn,
-    output logic        phyRstBOut,
-    output logic        lockedOut);
+    input  logic         intBIn,
+    output logic         phyRstBOut,
+    output logic         lockedOut);
 
     // Signals
     logic        rstTxLcl,    rstTx,       rst250, rstRxLcl;
@@ -90,7 +93,7 @@ module ethernet_to_book_top (
     ////////////////////////////////////////////
     // CDC slow (125MHz) -> fast (250MHz+)
     ////////////////////////////////////////////
-    slow_fast_cdc #(
+    slow_fast_cdc # (
         .LOW_LAT_CDC(1'b1))
     slow_fast_cdc_inst (
         .wrRstIn(rstRxLcl),
@@ -116,6 +119,9 @@ module ethernet_to_book_top (
 
     assign packetLostOut = packetLost;
 
+    ////////////////////////////////////////////
+    // ITCH market data parser
+    ////////////////////////////////////////////
     itch_parser itch_parser_inst (
         .rstIn(rst250),
         .clkIn(clk250),
@@ -130,6 +136,28 @@ module ethernet_to_book_top (
         .priceOut(price),
         .sharesOut(shares),
         .buySellOut(buySell));
+
+    ////////////////////////////////////////////
+    // Order book/map engine
+    ////////////////////////////////////////////
+    order_book_engine # (
+        .ORDER_MAP_DEPTH(2048), // Must be power of two
+        .ORDER_BOOK_DEPTH(5))
+    order_book_engine_inst (
+        .rstIn(rst250),
+        .clkIn(clk250),
+        .addValidIn(addValid),
+        .delValidIn(delValid),
+        .execValidIn(execValid),
+        .refNumIn(refNum),
+        .locateIn(locate),
+        .priceIn(price),
+        .sharesIn(shares),
+        .buySellIn(buySell),
+        .orderDataOut(orderDataOut),
+        .refDataOut(refDataOut),
+        .topBuyOut(topBuyOut),
+        .topSellOut(topSellOut));
 
     ////////////////////////////////////////////
     // Outputs

@@ -400,7 +400,6 @@ package tb_pkg;
             ipHeader = ipHeader << 16;
         end
 
-        $display("Ip header checksum calculated: ", ~onesSum);
         ip_header_chksum_calc = ~onesSum;
 
     endfunction
