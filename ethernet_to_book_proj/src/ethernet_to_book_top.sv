@@ -33,10 +33,10 @@ module ethernet_to_book_top (
     // output logic [31:0]  priceOut,         // temp
     // output logic [63:0]  sharesOut,        // temp
     // output logic         buySellOut,       // temp
-    output orderDataType orderDataOut,        // temp
-    output logic [64:0]  refDataOut,          // temp
+    // output orderDataType orderDataOut,     // temp
+    // output logic [64:0]  refDataOut,       // temp
     output bookLevelType topBuyOut,
-    output bookLevelType topSellOut,
+    //output bookLevelType topSellOut,
 
     input  logic         intBIn,
     output logic         phyRstBOut,

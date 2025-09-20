@@ -137,6 +137,7 @@ module itch_parser (
             execValidR     <= 1'b0;
             msgDone        <= 1'b0;
 
+            // TODO: Simplify to &
             addValidR      <= msgDone ? addTypeR  : 1'b0;
             delValidR      <= msgDone ? delTypeR  : 1'b0;
 

@@ -32,7 +32,7 @@ module eth_udp_parser (
     logic ipVerCheckR, protocolCheckR, nyseIpCheckR, ipChkSumPassR, ipToggleTwoBytesR, ipPulseTwoBytesR;
     logic udpDstCheckR, passItch;
     logic moldDoneR;
-    logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR;
+    logic ipV4FrameDoneR, ipV6FrameDoneR, endOfFrameDetR, checks1PassR, checks2PassR;
 
     logic [31:0] sessionIdsR [1:32];
     logic [31:0] currSeqNumR;
@@ -266,9 +266,20 @@ module eth_udp_parser (
     ////////////////////////////////////////////
     // ITCH passthrough control
     ////////////////////////////////////////////
-    assign passItch        =  dstMacCheckR & ipV4CheckR & protocolCheckR &  udpDstCheckR &
-                              ipVerCheckR  & moldDoneR  & nyseIpCheckR   &  ipChkSumPassR;
 
+    // This reduces levels of logic inbetween drive bits and valid out by pre-checking check bits
+    always_ff @(posedge clkIn) begin
+        if (rstIn) begin
+            checks1PassR <= 1'b1;
+            checks2PassR <= 1'b1;
+        end else begin
+            // 6
+            checks1PassR <= (dstMacCheckR & ipV4CheckR & protocolCheckR & ipVerCheckR & nyseIpCheckR & ipChkSumPassR);
+            checks2PassR <= (checks1PassR & udpDstCheckR);
+        end
+    end
+
+    assign passItch = checks2PassR  & moldDoneR;
     assign itchDataOut      = dataIn;
     assign itchDataValidOut = (dataValidIn & passItch);
 
