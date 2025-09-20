@@ -52,7 +52,7 @@ module mac_to_book_test;
         execShares : 32'hABCD7684,
         matchNum   : 64'h3BD786555512BED7};
 
-    int ITCH_DATA_LEN      = $bits({addOrder, delOrder, execOrder})/8;
+    int ITCH_DATA_LEN      = ($bits(addOrder)*6)/8;
     int IP_V4_TOTAL_LEN    = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN + IP_HEADER_LEN;
     int UDP_LENGTH         = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN;
 
@@ -123,22 +123,22 @@ module mac_to_book_test;
 
         // Add order 3
         addOrder.price  = 32'h00224000;
-        addOrder.shares = 32'h00000555;
+        addOrder.shares = 32'h00000554;
         send_itch_order_rgmii(rxIf, addOrder);
 
         // Add order 4
         addOrder.price  = 32'h00223000;
-        addOrder.shares = 32'h00000555;
+        addOrder.shares = 32'h00000553;
         send_itch_order_rgmii(rxIf, addOrder);
 
         // Add order 5
         addOrder.price  = 32'h00222000;
-        addOrder.shares = 32'h00000555;
+        addOrder.shares = 32'h00000552;
         send_itch_order_rgmii(rxIf, addOrder);
 
         // Add order 6 -> off book
         addOrder.price  = 32'h00221000;
-        addOrder.shares = 32'h00000555;
+        addOrder.shares = 32'h00000551;
         send_itch_order_rgmii(rxIf, addOrder);
         @(posedge rxIf.clk);
         rxIf.ctrl = 1'b0;
@@ -150,7 +150,7 @@ module mac_to_book_test;
     ////////////////////////////////////////////
     initial begin : check_output
 
-        #2000;
+        #10000;
         $display(" --- TEST PASSED ---");
         $finish;
     end

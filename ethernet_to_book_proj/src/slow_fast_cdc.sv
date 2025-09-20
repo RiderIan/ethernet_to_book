@@ -85,9 +85,16 @@ module slow_fast_cdc # (
 
             assign rdAddr         = grayBin#(ADDR_BITS)::gray2bin(graySyncRR);
 
-            always_ff @(posedge rdClkIn) begin : ram_read_port
+            always_ff @(posedge rdClkIn) begin : ram_data_reg
                 rdDataOut      <= cdcRamR[rdAddr];
-                rdDataValidOut <= graySyncRRR != graySyncRR;
+            end
+
+            always_ff @(posedge rdClkIn) begin : data_valid_reg
+                if (rdRstIn) begin
+                    rdDataValidOut <= 1'b0;
+                end else begin
+                    rdDataValidOut <= graySyncRRR != graySyncRR;
+                end
             end
 
         ////////////////////////////////////////////

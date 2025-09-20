@@ -13,6 +13,7 @@ import pkg::*;
 // IN PROGRESS
 ////////////////////////////////////////////
 
+(* keep = "true", dont_touch = "true" *)
 module order_book # (
     parameter int ORDER_BOOK_DEPTH)(
 
@@ -35,63 +36,110 @@ module order_book # (
     output logic [63:0] topBuyOut,   // temp
     output logic [63:0] topSellOut); // temp
 
-    bookLevelType buySideRamR  [1:ORDER_BOOK_DEPTH];
-    bookLevelType sellSideRamR [1:ORDER_BOOK_DEPTH];
-    logic [ 2:0]  buyMatchIdx, buyInsertIdx, sellMatchIdx, sellInsertIdx;
-    logic         insertBuy, insertSell;
-
-    // TODO: make variable depth
-    assign buyMatchIdx  = (priceIn == buySideRamR[1].price) ? 3'h1 :
-                          (priceIn == buySideRamR[2].price) ? 3'h2 :
-                          (priceIn == buySideRamR[3].price) ? 3'h3 :
-                          (priceIn == buySideRamR[4].price) ? 3'h4 :
-                          (priceIn == buySideRamR[5].price) ? 3'h5 : 3'h0;
-
-    // TODO: make variable depth
-    assign buyInsertIdx = (priceIn > buySideRamR[1].price) ? 3'h1 :
-                          (priceIn > buySideRamR[2].price) ? 3'h2 :
-                          (priceIn > buySideRamR[3].price) ? 3'h3 :
-                          (priceIn > buySideRamR[4].price) ? 3'h4 :
-                          (priceIn > buySideRamR[5].price) ? 3'h5 : 3'h0;
-
-    assign insertBuy = (buyInsertIdx < 3'h6) &  (buyMatchIdx == 3'h0);
-    assign addBuy    = (buyMatchIdx != 3'h0);
-
+    logic [31:0]  buySidePriceRamR    [1:ORDER_BOOK_DEPTH];
+    logic [31:0]  buySideQuantityRamR [1:ORDER_BOOK_DEPTH];
+    logic [31:0]  buyPriceLevelsR     [1:ORDER_BOOK_DEPTH];
+    logic [31:0]  buyPriceLevelsRR    [1:ORDER_BOOK_DEPTH];
+    logic [31:0]  buyQuantityLevelsR  [1:ORDER_BOOK_DEPTH];
+    logic [31:0]  buyQuantityLevelsRR [1:ORDER_BOOK_DEPTH];
+    logic [31:0]  priceR, priceFindIdxR, sharesR, checkPriceMatchR;
+    logic [ 2:0]  buyMatchIdxR, buyInsertIdxR, sellMatchIdx, sellInsertIdx;
+    logic         addBuyR, insertSell, doAddR, addValidR, addValidRR, buySellR;
 
     ////////////////////////////////////////////
-    // Insert and shift buy
+    // Necessary registers for delays/timing closure
     ////////////////////////////////////////////
-    always_ff @(posedge clkIn) begin
+    always_ff @(posedge clkIn) begin : input_regs
+        priceR        <= priceIn;
+        priceFindIdxR <= priceIn;
+        sharesR       <= sharesIn;
+        buySellR      <= buySellIn;
+    end
+
+    always_ff @(posedge clkIn) begin : valid_reg
         if (rstIn) begin
-            buySideRamR <= {default:'0};
+            addValidR  <= 1'b0;
+            addValidRR <= 1'b0;
         end else begin
-            for (int idx = 1; idx < ORDER_BOOK_DEPTH + 1; idx++) begin
-                if (addValidIn & insertBuy & buySellIn) begin
-                    buySideRamR[idx].quantity <= (idx < buyInsertIdx)  ? buySideRamR[idx].quantity :
-                                                 (idx == buyInsertIdx) ? sharesIn :
-                                                 buySideRamR[idx-1].quantity;
+            addValidR  <= addValidIn;
+            addValidRR <= addValidR;
+        end
+    end
 
-                    buySideRamR[idx].price    <= (idx < buyInsertIdx)  ? buySideRamR[idx].price :
-                                                 (idx == buyInsertIdx) ? priceIn :
-                                                 buySideRamR[idx-1].price;
-                end
-            end
-
-            // TODO: This feed back is not timing friendly, need to figure something else out bc the above passes timing alone
-            if (addValidIn & addBuy & buySellIn) begin
-                buySideRamR[buyMatchIdx].quantity <= buySideRamR[buyMatchIdx].quantity + sharesIn;
+    ////////////////////////////////////////////
+    // LUT ram read backs for easier routing
+    ////////////////////////////////////////////
+    always_ff @(posedge clkIn) begin : buy_read_lut_ram
+        if (rstIn) begin
+            buyPriceLevelsR     <= {default:'0};
+            buyQuantityLevelsR  <= {default:'0};
+            buyPriceLevelsRR    <= {default:'0};
+            buyQuantityLevelsRR <= {default:'0};
+        end else begin
+            for (int idx = 1; idx <= ORDER_BOOK_DEPTH; idx++) begin
+                buyPriceLevelsR[idx]     <= buySidePriceRamR[idx];
+                buyPriceLevelsRR[idx]    <= buyPriceLevelsR[idx];
+                buyQuantityLevelsR[idx]  <= buySideQuantityRamR[idx];
+                buyQuantityLevelsRR[idx] <= buyQuantityLevelsR[idx];
             end
         end
     end
 
-    // TODO: Pretty much copy and past buy side here
     ////////////////////////////////////////////
-    // Insert and shift sell
+    // Find insert and add index
     ////////////////////////////////////////////
+    always_ff @(posedge clkIn) begin : buy_insert_idx
+        for (logic [2:0] idx = ORDER_BOOK_DEPTH[2:0]; idx > 3'h0; idx--) begin
+            if (priceFindIdxR > buyPriceLevelsRR[idx])
+                buyInsertIdxR <= idx[2:0];
+        end
+    end
 
-    // temp for sythesis
-    assign topBuyOut = buySideRamR[1];
+    always_ff @(posedge clkIn) begin : buy_add_idx
+        addBuyR <= 1'b0;
+        for (logic [2:0] idx = ORDER_BOOK_DEPTH[2:0]; idx > 3'h0; idx--) begin
+           if (priceFindIdxR == buyPriceLevelsRR[idx]) begin
+               buyMatchIdxR <= idx[2:0];
+               addBuyR      <= 1'b1;
+           end
+        end
+    end
 
 
+    ////////////////////////////////////////////
+    // Update buy side book logic
+    ////////////////////////////////////////////
+    always_ff @(posedge clkIn) begin : update_book
+        if (rstIn) begin
+            buySidePriceRamR    <= {default:'0};
+            buySideQuantityRamR <= {default:'0};
+        end else begin
+            // Insert add order
+            for (int idx = 1; idx <= ORDER_BOOK_DEPTH; idx++) begin
+                if (addValidRR & ~addBuyR & buySellR) begin
+
+                    if (idx > buyInsertIdxR) begin
+                        buySidePriceRamR[idx]    <= buyPriceLevelsRR[idx-1];
+                        buySideQuantityRamR[idx] <= buyQuantityLevelsRR[idx-1];
+                    end
+
+                    if (idx == buyInsertIdxR) begin
+                        buySidePriceRamR[idx]    <= priceR;
+                        buySideQuantityRamR[idx] <= sharesR;
+                    end
+
+                end
+            end
+
+            // Increment add order
+            if (addValidRR & addBuyR & buySellR) begin
+                buySideQuantityRamR[buyMatchIdxR] <= buyQuantityLevelsRR[buyMatchIdxR] + sharesR;
+            end
+        end
+
+    end
+
+    // TEMP
+    assign topBuyOut = buyInsertIdxR;
 
 endmodule
