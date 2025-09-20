@@ -42,17 +42,19 @@ module order_book # (
     logic [31:0]  buyPriceLevelsRR    [1:ORDER_BOOK_DEPTH];
     logic [31:0]  buyQuantityLevelsR  [1:ORDER_BOOK_DEPTH];
     logic [31:0]  buyQuantityLevelsRR [1:ORDER_BOOK_DEPTH];
-    logic [31:0]  priceR, priceFindIdxR, sharesR, checkPriceMatchR;
+    logic [31:0]  priceR, priceRR, priceFindIdxR, sharesR, sharesRR, checkPriceMatchR;
     logic [ 2:0]  buyMatchIdxR, buyInsertIdxR, sellMatchIdx, sellInsertIdx;
     logic         addBuyR, insertSell, doAddR, addValidR, addValidRR, buySellR;
 
     ////////////////////////////////////////////
-    // Necessary registers for delays/timing closure
+    // Necessary registers for delays/fanout/timing closure
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : input_regs
         priceR        <= priceIn;
+        priceRR       <= priceR;
         priceFindIdxR <= priceIn;
         sharesR       <= sharesIn;
+        sharesRR      <= sharesR;
         buySellR      <= buySellIn;
     end
 
@@ -124,8 +126,8 @@ module order_book # (
                     end
 
                     if (idx == buyInsertIdxR) begin
-                        buySidePriceRamR[idx]    <= priceR;
-                        buySideQuantityRamR[idx] <= sharesR;
+                        buySidePriceRamR[idx]    <= priceRR;
+                        buySideQuantityRamR[idx] <= sharesRR;
                     end
 
                 end
@@ -133,7 +135,7 @@ module order_book # (
 
             // Increment add order
             if (addValidRR & addBuyR & buySellR) begin
-                buySideQuantityRamR[buyMatchIdxR] <= buyQuantityLevelsRR[buyMatchIdxR] + sharesR;
+                buySideQuantityRamR[buyMatchIdxR] <= buyQuantityLevelsRR[buyMatchIdxR] + sharesRR;
             end
         end
 
