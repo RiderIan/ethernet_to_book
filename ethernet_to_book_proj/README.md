@@ -11,7 +11,7 @@ A low-latency FPGA implementation of 1G networking stack for processing UDP pack
 - **Order Map**
 - **Variable Depth Order Book** (depth of 2k target for timing)
 - **Variable Depth Order Book** (depth of 5 targeted for timing)
-- **Tick to Book Latency of 837ns for Add Order Messages**
+- **Tick to Book Latency of 845ns for Add Order Messages**
 
 ## Architecture
 ### Data Path
@@ -36,7 +36,7 @@ A low-latency FPGA implementation of 1G networking stack for processing UDP pack
     - A hash table is implemented where the received ITCH reference number passed through a hash function to index into BRAM. The RAM is initialized to zeros which is how the insertion will detect if an address has been written to. Upon order deletion, the location will be zeroed out freeing it for future use.
     - One 64bit X 2K BRAM is used for reference number storage while a second 65 bit X 2K BRAM is used for price, quantity, and side data of correlating reference number.
 5. **Order Book** (in progress)
-    - Add order message type implemented with tick to top of book update in 837ns.
+    - Add order message type implemented with tick to top of book update in 845ns.
     - Single instrument supported with variable depth.
     - Delete and Executed messages will have higher latency due to the need for a lookup in the map.
 
