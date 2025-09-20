@@ -16,6 +16,8 @@ module mac_to_book_test;
     logic rst, clk100, rxClk, txClk, txCtrl, intB, phyRstB, locked, clk250;
     logic [ 3:0] txData;
     logic [15:0] ipChkSum;
+    logic [64:0] refData;
+    orderDataType orderData;
     bookLevelType topBuy;
 
 
@@ -92,6 +94,8 @@ module mac_to_book_test;
         .txCtrlOut(txCtrl),
         .txClkOut(txClk),
 
+        .orderDataOut(orderData),
+        .refDataOut(refData),
         .topBuyOut(topBuy),
 
         .intBIn(intB),

@@ -47,17 +47,34 @@ module order_map # (
     localparam int REF_DATA_WIDTH   = $bits(refNumIn);
     localparam int ORDER_INFO_WIDTH = $bits(priceIn) + $bits(sharesIn) + $bits(sharesIn);
 
-    logic addrMissR, wrEnA, waitReadAR;
+    logic addrMissR, wrEnA, wrEnB;
+    logic [1:0] waitReadAR;
 
     logic [REF_DATA_WIDTH-1:0]   refNumRamR    [0:ORDER_MAP_DEPTH-1];
     orderDataType                orderInfoRamR [0:ORDER_MAP_DEPTH-1];
 
     logic [ADDR_BITS-1:0]        hashKey;
-    logic [ADDR_BITS-1:0]        addrAR, addrARR;
-    logic [REF_DATA_WIDTH-1:0]   refDataI;
-    logic [REF_DATA_WIDTH-1:0]   refDataOR, refDataORR;
-    orderDataType                orderDataI, orderData;
-    orderDataType                orderDataOR, orderDataORR;
+    logic [ADDR_BITS-1:0]        addrAR, addrBR;
+    logic [REF_DATA_WIDTH-1:0]   refDataAI, refDataBIR;
+    logic [REF_DATA_WIDTH-1:0]   refDataOAR, refDataOARR, refDataOBR;
+    orderDataType                orderDataAI, orderDataBIO, rderData;
+    orderDataType                orderDataOAR, orderDataOBR;
+    logic                        addValidR, delValidR, execValidR;
+
+    ////////////////////////////////////////////
+    // Input regs - delays to account for RAM reads
+    ////////////////////////////////////////////
+    always_ff @(posedge clkIn) begin : input_regs
+        if (rstIn) begin
+            addValidR  <= 1'b0;
+            delValidR  <= 1'b0;
+            execValidR <= 1'b0;
+        end else begin
+            addValidR  <= addValidIn;
+            delValidR  <= delValidIn;
+            execValidR <= execValidIn;
+        end
+    end
 
     ////////////////////////////////////////////
     // RAMS
@@ -65,18 +82,28 @@ module order_map # (
     initial $readmemh("D:/FPGA/git_wa/ethernet_to_book_proj/src/reuse/init_ram_zeros.mem", refNumRamR);
     initial $readmemh("D:/FPGA/git_wa/ethernet_to_book_proj/src/reuse/init_ram_zeros.mem", orderInfoRamR);
 
-    always_ff @(posedge clkIn) begin : ref_num_ram_a
+    always_ff @(posedge clkIn) begin : ref_num_ram_port_a
         if (wrEnA)
-            refNumRamR[addrARR] <= refDataI;
-        refDataOR  <= refNumRamR[addrARR];
-        refDataORR <= refDataOR;
+            refNumRamR[addrAR] <= refDataAI;
+        refDataOAR  <= refNumRamR[addrAR];
     end
 
-    always_ff @(posedge clkIn) begin : order_info_ram_a
+    always_ff @(posedge clkIn) begin : ref_num_ram_port_b
+        if (wrEnB)
+            refNumRamR[addrBR] <= refDataBIR;
+        refDataOBR  <= refNumRamR[addrBR];
+    end
+
+    always_ff @(posedge clkIn) begin : order_info_ram_port_a
         if (wrEnA)
-            orderInfoRamR[addrARR] <= orderDataI;
-        orderDataOR  <= orderInfoRamR[addrARR];
-        orderDataORR <= orderDataOR;
+            orderInfoRamR[addrAR] <= orderDataAI;
+        orderDataOAR  <= orderInfoRamR[addrAR];
+    end
+
+    always_ff @(posedge clkIn) begin : order_info_ram_port_b
+        if (wrEnB)
+            orderInfoRamR[addrBR] <= orderDataBIO;
+        orderDataOBR  <= orderInfoRamR[addrBR];
     end
 
 
@@ -88,42 +115,40 @@ module order_map # (
                      refNumIn[(ADDR_BITS-1)*3+2:(ADDR_BITS-1)*2+2] ^
                      refNumIn[(ADDR_BITS-1)*4+3:(ADDR_BITS-1)*3+3];
 
-    assign orderData = {priceIn, sharesIn, buySellIn};
+    always_ff @(posedge clkIn) begin : ram_a_input_reg
+        orderDataAI <= {priceIn, sharesIn, buySellIn};
+        refDataAI   <= refNumIn;
+        refDataOARR <= refDataOAR;
+    end
 
     always_ff @(posedge clkIn) begin : insert_order
         if (rstIn) begin
-            refDataI   <= '0;
-            orderDataI <= '0;
-            addrAR     <= '0;
-            addrARR    <= '0;
-            wrEnA      <= '0;
-            addrMissR  <= '0;
-            waitReadAR <= '0;
+            addrAR       <= '0;
+            wrEnA        <= '0;
+            addrMissR    <= '0;
+            waitReadAR   <= '0;
         end else begin
-            addrAR  <= hashKey;
-            addrARR <= addrAR;
-            wrEnA   <= 1'b0;
+            wrEnA        <= 1'b0;
 
-            if (addValidIn | addrMissR) begin
-                if (refDataORR == '0) begin
-                    refDataI   <= refNumIn;
-                    orderDataI <= orderData;
-                    wrEnA      <= 1'b1;
-                    addrMissR  <= 1'b0;
-                    addrAR     <= addrAR;
+            if (addValidIn)
+                addrAR  <= hashKey;
+
+            if (addValidR | addrMissR) begin
+                if (refDataOARR == '0) begin
+                    wrEnA        <= 1'b1;
+                    addrMissR    <= 1'b0;
                 end else begin
                     // Need one extra clock after addr increment to get new value back
                     // Asynchronous read not really possible with BRAM (too large for distrubuted)
-                    if (~waitReadAR)
+                    if (waitReadAR == '0)
                         addrAR      <= addrAR + 1;
 
-                    waitReadAR <= ~waitReadAR;
+                    waitReadAR <= waitReadAR + 1;
                     addrMissR <= 1'b1;
                 end
             end
         end
     end
-
 
     ////////////////////////////////////////////
     // Read side
@@ -132,8 +157,8 @@ module order_map # (
     ////////////////////////////////////////////
     // Outputs
     ////////////////////////////////////////////
-    assign orderDataOut = orderDataORR;  // temp
-    assign refDataOut   = refDataORR;      // temp
+    assign orderDataOut = orderDataOAR;  // temp
+    assign refDataOut   = refDataOAR;    // temp
 
 
 

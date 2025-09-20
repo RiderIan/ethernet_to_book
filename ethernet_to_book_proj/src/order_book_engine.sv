@@ -38,26 +38,26 @@ module order_book_engine # (
     ////////////////////////////////////////////
     // Order map
     ////////////////////////////////////////////
-    // order_map # (
-    //     .ORDER_MAP_DEPTH(ORDER_MAP_DEPTH))
-    // order_map_inst (
-    //     .rstIn(rstIn),
-    //     .clkIn(clkIn),
-    //     .addValidIn(addValidIn),
-    //     .delValidIn(delValidIn),
-    //     .execValidIn(execValidIn),
-    //     .refNumIn(refNumIn),
-    //     .locateIn(locateIn),
-    //     .priceIn(priceIn),
-    //     .sharesIn(sharesIn),
-    //     .buySellIn(buySellIn),
-    //     .delExecValidOut(delExecValid),
-    //     .locateOut(locate),
-    //     .priceOut(price),
-    //     .sharesOut(shares),
-    //     .buySellOut(buySell),
-    //     .orderDataOut(orderDataOut),
-    //     .refDataOut(refDataOut));
+    order_map # (
+        .ORDER_MAP_DEPTH(ORDER_MAP_DEPTH))
+    order_map_inst (
+        .rstIn(rstIn),
+        .clkIn(clkIn),
+        .addValidIn(addValidIn),
+        .delValidIn(delValidIn),
+        .execValidIn(execValidIn),
+        .refNumIn(refNumIn),
+        .locateIn(locateIn),
+        .priceIn(priceIn),
+        .sharesIn(sharesIn),
+        .buySellIn(buySellIn),
+        .delExecValidOut(delExecValid),
+        .locateOut(locate),
+        .priceOut(price),
+        .sharesOut(shares),
+        .buySellOut(buySell),
+        .orderDataOut(orderDataOut),
+        .refDataOut(refDataOut));
 
     ////////////////////////////////////////////
     // Order book
