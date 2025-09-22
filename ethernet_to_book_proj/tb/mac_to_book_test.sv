@@ -54,7 +54,7 @@ module mac_to_book_test;
         execShares : 32'hABCD7684,
         matchNum   : 64'h3BD786555512BED7};
 
-    int ITCH_DATA_LEN      = ($bits(addOrder)*6)/8;
+    int ITCH_DATA_LEN      = ($bits(addOrder)*6 + $bits({delOrder, execOrder}))/8;
     int IP_V4_TOTAL_LEN    = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN + IP_HEADER_LEN;
     int UDP_LENGTH         = ITCH_DATA_LEN + MOLD_HEADER_LEN + UDP_HEADER_LEN;
 
@@ -119,31 +119,42 @@ module mac_to_book_test;
         send_mold_header_rgmii(rxIf, moldHdr);
 
         // Add order 1
+        addOrder.refNum = 64'hDEF12373DEFDE89C; // matches delete order ref num
         send_itch_order_rgmii(rxIf, addOrder);
 
         // Add order 2
+        addOrder.refNum = 64'hABCD167ABCDB1005; // matches execute order ref num
         addOrder.shares = 32'h00000555;
         send_itch_order_rgmii(rxIf, addOrder);
 
         // Add order 3
+        addOrder.refNum = 64'hABCD167ABCDB1006;
         addOrder.price  = 32'h00224000;
         addOrder.shares = 32'h00000554;
         send_itch_order_rgmii(rxIf, addOrder);
 
-        // Add order 4
-        addOrder.price  = 32'h00223000;
+        // Add order 4 -> colides with previous order
+        addOrder.refNum = 64'hABCD167ABCDB1007;
         addOrder.shares = 32'h00000553;
         send_itch_order_rgmii(rxIf, addOrder);
 
         // Add order 5
+        addOrder.refNum = 64'hABCD167ABCDB1008;
         addOrder.price  = 32'h00222000;
         addOrder.shares = 32'h00000552;
         send_itch_order_rgmii(rxIf, addOrder);
 
         // Add order 6 -> off book
+        addOrder.refNum = 64'hABCD167ABCDB1009;
         addOrder.price  = 32'h00221000;
         addOrder.shares = 32'h00000551;
         send_itch_order_rgmii(rxIf, addOrder);
+
+        // Delete first order
+        send_itch_delete_rgmii(rxIf, delOrder);
+
+        // Execute second order
+        send_itch_execute_rgmii(rxIf, execOrder);
         @(posedge rxIf.clk);
         rxIf.ctrl = 1'b0;
 
