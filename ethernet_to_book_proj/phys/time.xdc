@@ -24,3 +24,9 @@ create_generated_clock -name rx_clk_125_dly -source [get_ports rxClkIn] -edges {
 set_max_delay 4 -from [get_clocks rx_clk_125_dly] -to [get_clocks clk_250] -datapath_only
 # May need for async fifo method:
 set_false_path  -through [get_cells -hierarchical -filter {NAME =~ "*xpm_fifo_async_inst*" && NAME =~ "*fifo_rd_rst_ic_reg*"}]
+
+###########################################
+# Other false paths
+###########################################
+# False path from the input of port A to the address of port B. I think it's connecting these concurrently which is not reality
+set_false_path -from [get_nets -hierarchical [order_book_engine_inst/order_map_inst/ref_num_ram/regsR_reg[*]]] -to [get_nets -hierarchical [order_book_engine_inst/order_map_inst/addrBR_reg[*]]]

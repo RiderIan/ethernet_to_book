@@ -48,33 +48,25 @@ module order_map # (
     localparam int ORDER_INFO_WIDTH = $bits(priceIn) + $bits(sharesIn) + $bits(sharesIn);
 
     logic addrMissR, wrEnA, wrEnB;
-    logic [1:0] waitReadAR;
+    logic [1:0] waitReadAR, waitReadBR;
 
-    logic [REF_DATA_WIDTH-1:0]   refNumRamR    [0:ORDER_MAP_DEPTH-1];
-    orderDataType                orderInfoRamR [0:ORDER_MAP_DEPTH-1];
+    (* ram_style = "block" *) logic [REF_DATA_WIDTH-1:0] refNumRamR    [0:ORDER_MAP_DEPTH-1];
+    (* ram_style = "block" *) orderDataType              orderInfoRamR [0:ORDER_MAP_DEPTH-1];
 
     logic [ADDR_BITS-1:0]        hashKey;
     logic [ADDR_BITS-1:0]        addrAR, addrBR;
-    logic [REF_DATA_WIDTH-1:0]   refDataAI, refDataBIR;
-    logic [REF_DATA_WIDTH-1:0]   refDataOAR, refDataOARR, refDataOBR;
-    orderDataType                orderDataAI, orderDataBIO, rderData;
-    orderDataType                orderDataOAR, orderDataOBR;
-    logic                        addValidR, delValidR, execValidR;
+    logic [REF_DATA_WIDTH-1:0]   refDataAI, refDataDly;
+    logic [REF_DATA_WIDTH-1:0]   refDataOAR, refDataOARR, refDataOBR, refDataOBRR;
+    orderDataType                orderDataAI, orderData;
+    orderDataType                orderDataOBR, orderDataOAR;
+    logic                        addValidDlyR, delValidDlyR, execValidDlyR, refNumWrongR;
 
     ////////////////////////////////////////////
     // Input regs - delays to account for RAM reads
     ////////////////////////////////////////////
-    always_ff @(posedge clkIn) begin : input_regs
-        if (rstIn) begin
-            addValidR  <= 1'b0;
-            delValidR  <= 1'b0;
-            execValidR <= 1'b0;
-        end else begin
-            addValidR  <= addValidIn;
-            delValidR  <= delValidIn;
-            execValidR <= execValidIn;
-        end
-    end
+    synchronizer_ff #(.DEPTH(3)) add_valid_dly_inst  (.rstIn(rstIn), .clkIn(clkIn), .DIn(addValidIn),  .QOut(addValidDlyR));
+    synchronizer_ff #(.DEPTH(3)) del_valid_dly_inst  (.rstIn(rstIn), .clkIn(clkIn), .DIn(delValidIn),  .QOut(delValidDlyR));
+    synchronizer_ff #(.DEPTH(3)) exec_valid_dly_inst (.rstIn(rstIn), .clkIn(clkIn), .DIn(execValidIn), .QOut(execValidDlyR));
 
     ////////////////////////////////////////////
     // RAMS
@@ -90,7 +82,7 @@ module order_map # (
 
     always_ff @(posedge clkIn) begin : ref_num_ram_port_b
         if (wrEnB)
-            refNumRamR[addrBR] <= refDataBIR;
+            refNumRamR[addrBR] <= '0;
         refDataOBR  <= refNumRamR[addrBR];
     end
 
@@ -102,24 +94,23 @@ module order_map # (
 
     always_ff @(posedge clkIn) begin : order_info_ram_port_b
         if (wrEnB)
-            orderInfoRamR[addrBR] <= orderDataBIO;
+            orderInfoRamR[addrBR] <= '0;
         orderDataOBR  <= orderInfoRamR[addrBR];
     end
 
 
     ////////////////////////////////////////////
-    // Write side (add only)
+    // Add order
     ////////////////////////////////////////////
     assign hashKey = refNumIn[ADDR_BITS-1      :0]                 ^
                      refNumIn[(ADDR_BITS-1)*2+1:ADDR_BITS]         ^
                      refNumIn[(ADDR_BITS-1)*3+2:(ADDR_BITS-1)*2+2] ^
                      refNumIn[(ADDR_BITS-1)*4+3:(ADDR_BITS-1)*3+3];
 
-    always_ff @(posedge clkIn) begin : ram_a_input_reg
-        orderDataAI <= {priceIn, sharesIn, buySellIn};
-        refDataAI   <= refNumIn;
-        refDataOARR <= refDataOAR;
-    end
+    assign orderData = {priceIn, sharesIn, buySellIn};
+    synchronizer_ff #(.DEPTH(3), .WIDTH(ORDER_INFO_WIDTH)) order_data_ram (.rstIn(rstIn), .clkIn(clkIn), .DIn(orderData), .QOut(orderDataAI));
+    synchronizer_ff #(.DEPTH(3), .WIDTH(REF_DATA_WIDTH))   ref_num_ram    (.rstIn(rstIn), .clkIn(clkIn), .DIn(refNumIn),  .QOut(refDataAI));
+    synchronizer_ff #(.DEPTH(3), .WIDTH(REF_DATA_WIDTH))   ref_num_logic  (.rstIn(rstIn), .clkIn(clkIn), .DIn(refNumIn),  .QOut(refDataDly));
 
     always_ff @(posedge clkIn) begin : insert_order
         if (rstIn) begin
@@ -133,7 +124,7 @@ module order_map # (
             if (addValidIn)
                 addrAR  <= hashKey;
 
-            if (addValidR | addrMissR) begin
+            if (addValidDlyR | addrMissR) begin
                 if (refDataOARR == '0) begin
                     wrEnA        <= 1'b1;
                     addrMissR    <= 1'b0;
@@ -151,16 +142,52 @@ module order_map # (
     end
 
     ////////////////////////////////////////////
-    // Read side
+    // Delete/Execute order
     ////////////////////////////////////////////
+    always_ff @(posedge clkIn) begin : lookup_order
+        if (rstIn) begin
+            addrBR          <= '0;
+            refNumWrongR    <= '0;
+            waitReadBR      <= '0;
+            wrEnB           <= '0;
+            delExecValidOut <= 1'b0;
+        end else begin
+            wrEnB           <= 1'b0;
+            delExecValidOut <= 1'b0;
+
+            if (delValidIn | execValidIn)
+                addrBR <= hashKey;
+
+            if (delValidDlyR | execValidDlyR | refNumWrongR) begin
+                if (refDataOBRR == refDataDly) begin
+                    // Writes zeros to both BRAMs
+                    wrEnB           <= 1'b1;
+                    refNumWrongR    <= 1'b0;
+                    // Drive outputs to book
+                    delExecValidOut <= 1'b1;
+                end else begin
+                    if (waitReadBR == '0)
+                        addrBR <= addrBR + 1;
+
+                    waitReadBR   <= waitReadBR + 1;
+                    refNumWrongR <= 1'b1;
+                end
+            end
+        end
+    end
+
+    always_ff @(posedge clkIn) begin : ref_ram_data_dly_reg
+        refDataOBRR <= refDataOBR;
+        refDataOARR <= refDataOAR;
+    end
 
     ////////////////////////////////////////////
     // Outputs
     ////////////////////////////////////////////
-    assign orderDataOut = orderDataOAR;  // temp
-    assign refDataOut   = refDataOAR;    // temp
-
-
-
+    always_ff @(posedge clkIn) begin : output_regs
+        priceOut      <= orderDataOBR.price;
+        sharesOut     <= orderDataOBR.shares;
+        buySellOut    <= orderDataOBR.buySell;
+    end
 
 endmodule
