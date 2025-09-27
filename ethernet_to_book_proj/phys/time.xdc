@@ -29,4 +29,4 @@ set_false_path  -through [get_cells -hierarchical -filter {NAME =~ "*xpm_fifo_as
 # Other false paths
 ###########################################
 # False path from the input of port A to the address of port B. I think it's connecting these concurrently which is not reality
-set_false_path -from [get_nets -hierarchical [order_book_engine_inst/order_map_inst/ref_num_ram/regsR_reg[*]]] -to [get_nets -hierarchical [order_book_engine_inst/order_map_inst/addrBR_reg[*]]]
+set_false_path -from [get_pins order_book_engine_inst/order_map_inst/ref_num_ram/regsR_reg[*][*]/C] -to [get_pins order_book_engine_inst/order_map_inst/addrBR_reg[*]/CE]
