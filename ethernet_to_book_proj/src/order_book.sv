@@ -31,10 +31,9 @@ module order_book # (
     input logic [15:0]  mapLocateIn,
     input logic [31:0]  mapPriceIn,
     input logic [31:0]  mapSharesIn,
-    input logic         mapBuySellIn,
+    input logic         mapBuySellIn);
 
-    output logic [63:0] topBuyOut,   // temp
-    output logic [63:0] topSellOut); // temp
+    localparam int ADDR_BITS = $clog2(ORDER_BOOK_DEPTH);
 
     logic [31:0]  buySidePriceRamR    [1:ORDER_BOOK_DEPTH];
     logic [31:0]  buySideQuantityRamR [1:ORDER_BOOK_DEPTH];
@@ -42,30 +41,29 @@ module order_book # (
     logic [31:0]  buyPriceLevelsRR    [1:ORDER_BOOK_DEPTH];
     logic [31:0]  buyQuantityLevelsR  [1:ORDER_BOOK_DEPTH];
     logic [31:0]  buyQuantityLevelsRR [1:ORDER_BOOK_DEPTH];
-    logic [31:0]  priceR, priceRR, priceFindIdxR, sharesR, sharesRR, checkPriceMatchR;
-    logic [ 2:0]  buyMatchIdxR, buyInsertIdxR, sellMatchIdx, sellInsertIdx;
-    logic         addBuyR, insertSell, doAddR, addValidR, addValidRR, buySellR;
+
+    logic [31:0]  sellSidePriceRamR    [1:ORDER_BOOK_DEPTH];
+    logic [31:0]  sellSideQuantityRamR [1:ORDER_BOOK_DEPTH];
+    logic [31:0]  priceDlyR, mapPriceDlyR, priceFindIdxR, sharesR, sharesDlyR, checkPriceMatchR, mapSharesDlyR;
+    logic [ORDER_BOOK_DEPTH:1] compInsertOneHot, compMatchOneHot;
+    logic [ADDR_BITS-1:0]      buyMatchIdxR, buyInsertIdxR, sellMatchIdx, sellInsertIdx, compInsert;
+    logic         matchFoundR, insertSell, doAddR, addValidR, addValidDlyR, delExecValidDlyR, buySellDlyR, mapBuySellDlyR, bookUpdatedR, bookUpdatedRR;
 
     ////////////////////////////////////////////
     // Necessary registers for delays/fanout/timing closure
     ////////////////////////////////////////////
-    always_ff @(posedge clkIn) begin : input_regs
-        priceR        <= priceIn;
-        priceRR       <= priceR;
-        priceFindIdxR <= priceIn;
-        sharesR       <= sharesIn;
-        sharesRR      <= sharesR;
-        buySellR      <= buySellIn;
-    end
+    pipe #(.DEPTH(2), .WIDTH(32)) price_reg_inst          (.rstIn(1'b0),  .clkIn(clkIn), .DIn(priceIn),        .QOut(priceDlyR));
+    pipe #(.DEPTH(2), .WIDTH(32)) shares_reg_inst         (.rstIn(1'b0),  .clkIn(clkIn), .DIn(sharesIn),       .QOut(sharesDlyR));
+    pipe #(.DEPTH(2), .WIDTH(32)) map_price_reg_inst      (.rstIn(1'b0),  .clkIn(clkIn), .DIn(mapPriceIn),     .QOut(mapPriceDlyR));
+    pipe #(.DEPTH(2), .WIDTH(32)) map_shares_reg_inst     (.rstIn(1'b0),  .clkIn(clkIn), .DIn(mapSharesIn),    .QOut(mapSharesDlyR));
+    pipe #(.DEPTH(2), .WIDTH( 1)) buy_sell_reg_inst       (.rstIn(1'b0),  .clkIn(clkIn), .DIn(buySellIn),      .QOut(buySellDlyR));
+    pipe #(.DEPTH(2), .WIDTH( 1)) map_buy_sell_reg_inst   (.rstIn(1'b0),  .clkIn(clkIn), .DIn(mapBuySellIn),   .QOut(mapBuySellDlyR));
+    pipe #(.DEPTH(2), .WIDTH( 1)) add_valid_reg_inst      (.rstIn(rstIn), .clkIn(clkIn), .DIn(addValidIn),     .QOut(addValidDlyR));
+    pipe #(.DEPTH(2), .WIDTH( 1)) del_exec_valid_reg_inst (.rstIn(rstIn), .clkIn(clkIn), .DIn(delExecValidIn), .QOut(delExecValidDlyR));
 
-    always_ff @(posedge clkIn) begin : valid_reg
-        if (rstIn) begin
-            addValidR  <= 1'b0;
-            addValidRR <= 1'b0;
-        end else begin
-            addValidR  <= addValidIn;
-            addValidRR <= addValidR;
-        end
+    always_ff @(posedge clkIn) begin : price_idx_mux
+        priceFindIdxR <= addValidIn     ? priceIn :
+                         delExecValidIn ? mapPriceIn : '0;
     end
 
     ////////////////////////////////////////////
@@ -98,11 +96,11 @@ module order_book # (
     end
 
     always_ff @(posedge clkIn) begin : buy_add_idx
-        addBuyR <= 1'b0;
+        matchFoundR <= 1'b0;
         for (logic [2:0] idx = ORDER_BOOK_DEPTH[2:0]; idx > 3'h0; idx--) begin
            if (priceFindIdxR == buyPriceLevelsRR[idx]) begin
                buyMatchIdxR <= idx[2:0];
-               addBuyR      <= 1'b1;
+               matchFoundR  <= 1'b1;
            end
         end
     end
@@ -118,30 +116,43 @@ module order_book # (
         end else begin
             // Insert add order
             for (int idx = 1; idx <= ORDER_BOOK_DEPTH; idx++) begin
-                if (addValidRR & ~addBuyR & buySellR) begin
+                if (addValidDlyR & buySellDlyR) begin
 
-                    if (idx > buyInsertIdxR) begin
+                    if ((idx > buyInsertIdxR) & ~matchFoundR) begin
                         buySidePriceRamR[idx]    <= buyPriceLevelsRR[idx-1];
                         buySideQuantityRamR[idx] <= buyQuantityLevelsRR[idx-1];
                     end
 
-                    if (idx == buyInsertIdxR) begin
-                        buySidePriceRamR[idx]    <= priceRR;
-                        buySideQuantityRamR[idx] <= sharesRR;
+                    if ((idx == buyInsertIdxR) & ~matchFoundR) begin
+                        buySidePriceRamR[idx]    <= priceDlyR;
+                        buySideQuantityRamR[idx] <= sharesDlyR;
                     end
 
-                end
-            end
+                    if ((idx == buyMatchIdxR) & matchFoundR)
+                        buySideQuantityRamR[idx] <= buyQuantityLevelsRR[idx] + sharesDlyR;
 
-            // Increment add order
-            if (addValidRR & addBuyR & buySellR) begin
-                buySideQuantityRamR[buyMatchIdxR] <= buyQuantityLevelsRR[buyMatchIdxR] + sharesRR;
+                end
+
+                if ((idx == buyMatchIdxR) & delExecValidDlyR & matchFoundR & buySellDlyR)
+                    buySideQuantityRamR[idx] <= buyQuantityLevelsRR[idx] - mapSharesDlyR;
             end
         end
-
     end
 
-    // TEMP
-    assign topBuyOut = buyInsertIdxR;
+    always_ff @(posedge clkIn) begin : ila_trig_reg
+        if (rstIn) begin
+            bookUpdatedR  <= 1'b0;
+            bookUpdatedRR <= 1'b0;
+        end else begin
+            bookUpdatedR  <= addValidDlyR | delExecValidDlyR;
+            bookUpdatedRR <= bookUpdatedR;
+        end
+    end
+
+    top_of_book_ila book_ila_inst (
+        .clk(clkIn),
+        .trig_in(bookUpdatedRR),
+        .probe0({buySidePriceRamR[1], buySideQuantityRamR[1]}),
+        .probe1({sellSidePriceRamR[1], sellSideQuantityRamR[1]}));
 
 endmodule

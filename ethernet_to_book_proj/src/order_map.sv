@@ -36,10 +36,7 @@ module order_map # (
     output logic [15:0] locateOut,
     output logic [31:0] priceOut,
     output logic [31:0] sharesOut,
-    output logic        buySellOut,
-
-    output orderDataType orderDataOut, // temp
-    output logic [64:0]  refDataOut);  // temp
+    output logic        buySellOut);
 
 
     localparam int ADDR_BITS        = $clog2(ORDER_MAP_DEPTH);
@@ -59,14 +56,14 @@ module order_map # (
     logic [REF_DATA_WIDTH-1:0]   refDataOAR, refDataOARR, refDataOBR, refDataOBRR;
     orderDataType                orderDataAI, orderData;
     orderDataType                orderDataOBR, orderDataOAR;
-    logic                        addValidDlyR, delValidDlyR, execValidDlyR, refNumWrongR;
+    logic                        addValidDlyR, delValidDlyR, execValidDlyR, refNumWrongR, delExecValidR;
 
     ////////////////////////////////////////////
     // Input regs - delays to account for RAM reads
     ////////////////////////////////////////////
-    synchronizer_ff #(.DEPTH(3)) add_valid_dly_inst  (.rstIn(rstIn), .clkIn(clkIn), .DIn(addValidIn),  .QOut(addValidDlyR));
-    synchronizer_ff #(.DEPTH(3)) del_valid_dly_inst  (.rstIn(rstIn), .clkIn(clkIn), .DIn(delValidIn),  .QOut(delValidDlyR));
-    synchronizer_ff #(.DEPTH(3)) exec_valid_dly_inst (.rstIn(rstIn), .clkIn(clkIn), .DIn(execValidIn), .QOut(execValidDlyR));
+    pipe #(.DEPTH(3)) add_valid_dly_inst  (.rstIn(rstIn), .clkIn(clkIn), .DIn(addValidIn),  .QOut(addValidDlyR));
+    pipe #(.DEPTH(3)) del_valid_dly_inst  (.rstIn(rstIn), .clkIn(clkIn), .DIn(delValidIn),  .QOut(delValidDlyR));
+    pipe #(.DEPTH(3)) exec_valid_dly_inst (.rstIn(rstIn), .clkIn(clkIn), .DIn(execValidIn), .QOut(execValidDlyR));
 
     ////////////////////////////////////////////
     // RAMS
@@ -86,6 +83,11 @@ module order_map # (
         refDataOBR  <= refNumRamR[addrBR];
     end
 
+    always_ff @(posedge clkIn) begin : ref_ram_data_dly_reg
+        refDataOBRR <= refDataOBR;
+        refDataOARR <= refDataOAR;
+    end
+
     always_ff @(posedge clkIn) begin : order_info_ram_port_a
         if (wrEnA)
             orderInfoRamR[addrAR] <= orderDataAI;
@@ -98,7 +100,6 @@ module order_map # (
         orderDataOBR  <= orderInfoRamR[addrBR];
     end
 
-
     ////////////////////////////////////////////
     // Add order
     ////////////////////////////////////////////
@@ -108,9 +109,10 @@ module order_map # (
                      refNumIn[(ADDR_BITS-1)*4+3:(ADDR_BITS-1)*3+3];
 
     assign orderData = {priceIn, sharesIn, buySellIn};
-    synchronizer_ff #(.DEPTH(3), .WIDTH(ORDER_INFO_WIDTH)) order_data_ram (.rstIn(rstIn), .clkIn(clkIn), .DIn(orderData), .QOut(orderDataAI));
-    synchronizer_ff #(.DEPTH(3), .WIDTH(REF_DATA_WIDTH))   ref_num_ram    (.rstIn(rstIn), .clkIn(clkIn), .DIn(refNumIn),  .QOut(refDataAI));
-    synchronizer_ff #(.DEPTH(3), .WIDTH(REF_DATA_WIDTH))   ref_num_logic  (.rstIn(rstIn), .clkIn(clkIn), .DIn(refNumIn),  .QOut(refDataDly));
+
+    pipe #(.DEPTH(3), .WIDTH(ORDER_INFO_WIDTH)) order_data_ram (.rstIn(rstIn), .clkIn(clkIn), .DIn(orderData), .QOut(orderDataAI));
+    pipe #(.DEPTH(3), .WIDTH(REF_DATA_WIDTH))   ref_num_ram    (.rstIn(rstIn), .clkIn(clkIn), .DIn(refNumIn),  .QOut(refDataAI));
+    pipe #(.DEPTH(3), .WIDTH(REF_DATA_WIDTH))   ref_num_logic  (.rstIn(rstIn), .clkIn(clkIn), .DIn(refNumIn),  .QOut(refDataDly));
 
     always_ff @(posedge clkIn) begin : insert_order
         if (rstIn) begin
@@ -176,18 +178,11 @@ module order_map # (
         end
     end
 
-    always_ff @(posedge clkIn) begin : ref_ram_data_dly_reg
-        refDataOBRR <= refDataOBR;
-        refDataOARR <= refDataOAR;
-    end
-
     ////////////////////////////////////////////
     // Outputs
     ////////////////////////////////////////////
-    always_ff @(posedge clkIn) begin : output_regs
-        priceOut      <= orderDataOBR.price;
-        sharesOut     <= orderDataOBR.shares;
-        buySellOut    <= orderDataOBR.buySell;
-    end
+    pipe #(.DEPTH(2), .WIDTH(32)) price_out_inst   (.rstIn(1'b0), .clkIn(clkIn), .DIn(orderDataOBR.price),   .QOut(priceOut));
+    pipe #(.DEPTH(2), .WIDTH(32)) shares_out_inst  (.rstIn(1'b0), .clkIn(clkIn), .DIn(orderDataOBR.shares),  .QOut(sharesOut));
+    pipe #(.DEPTH(2), .WIDTH( 1)) buysell_out_inst (.rstIn(1'b0), .clkIn(clkIn), .DIn(orderDataOBR.buySell), .QOut(buySellOut));
 
 endmodule
