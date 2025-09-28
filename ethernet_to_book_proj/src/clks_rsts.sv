@@ -31,19 +31,19 @@ module clks_rsts(
     assign rstLcl = rstIn;
 
     // System clock domain
-    synchronizer_ff #(.DEPTH(3)) sync_rst_lcl_inst    (.rstIn(1'b0), .clkIn(clkLcl),   .DIn(rstLcl), .QOut(rstLclSync));
+    pipe #(.DEPTH(3), .ALLOW_SRL(1'b0)) sync_rst_lcl_inst    (.rstIn(1'b0), .clkIn(clkLcl),   .DIn(rstLcl), .QOut(rstLclSync));
 
     // Tx local domain
-    synchronizer_ff #(.DEPTH(3)) sync_tx_lcl_rst_inst (.rstIn(1'b0), .clkIn(txClkLcl), .DIn(rstLcl), .QOut(rstTxLclOut));
+    pipe #(.DEPTH(3), .ALLOW_SRL(1'b0)) sync_tx_lcl_rst_inst (.rstIn(1'b0), .clkIn(txClkLcl), .DIn(rstLcl), .QOut(rstTxLclOut));
 
     // Tx output clock domain
-    synchronizer_ff #(.DEPTH(3)) sync_tx_rst_inst     (.rstIn(1'b0), .clkIn(txClk),    .DIn(rstLcl), .QOut(rstTxOut));
+    pipe #(.DEPTH(3), .ALLOW_SRL(1'b0)) sync_tx_rst_inst     (.rstIn(1'b0), .clkIn(txClk),    .DIn(rstLcl), .QOut(rstTxOut));
 
     // 250Mhz local domain
-    synchronizer_ff #(.DEPTH(3)) sync_250_rst_inst    (.rstIn(1'b0), .clkIn(clk250),   .DIn(rstLcl), .QOut(rst250Out));
+    pipe #(.DEPTH(3), .ALLOW_SRL(1'b0)) sync_250_rst_inst    (.rstIn(1'b0), .clkIn(clk250),   .DIn(rstLcl), .QOut(rst250Out));
 
     // Rx local domain
-    synchronizer_ff #(.DEPTH(3)) sync_rx_rst_inst     (.rstIn(1'b0), .clkIn(rxClkLcl), .DIn(rstLcl), .QOut(rstRxLclOut));
+    pipe #(.DEPTH(3), .ALLOW_SRL(1'b0)) sync_rx_rst_inst     (.rstIn(1'b0), .clkIn(rxClkLcl), .DIn(rstLcl), .QOut(rstRxLclOut));
 
     system_clocks_gen mmcm0_inst (
         .clk_out1(txClkLcl),          // Local 125Mhz for RGMII

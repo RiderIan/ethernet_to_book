@@ -94,10 +94,6 @@ module mac_to_book_test;
         .txCtrlOut(txCtrl),
         .txClkOut(txClk),
 
-        .orderDataOut(orderData),
-        .refDataOut(refData),
-        .topBuyOut(topBuy),
-
         .intBIn(intB),
         .phyRstBOut(phyRstB),
         .lockedOut(locked));
@@ -133,7 +129,7 @@ module mac_to_book_test;
         addOrder.shares = 32'h00000554;
         send_itch_order_rgmii(rxIf, addOrder);
 
-        // Add order 4 -> colides with previous order
+        // Add order 4
         addOrder.refNum = 64'hABCD167ABCDB1007;
         addOrder.shares = 32'h00000553;
         send_itch_order_rgmii(rxIf, addOrder);
@@ -144,7 +140,7 @@ module mac_to_book_test;
         addOrder.shares = 32'h00000552;
         send_itch_order_rgmii(rxIf, addOrder);
 
-        // Add order 6 -> off book
+        // Add order 6
         addOrder.refNum = 64'hABCD167ABCDB1009;
         addOrder.price  = 32'h00221000;
         addOrder.shares = 32'h00000551;

@@ -23,13 +23,7 @@ module order_book_engine # (
     input  logic [15:0] locateIn,
     input  logic [31:0] priceIn,
     input  logic [31:0] sharesIn,
-    input  logic        buySellIn,
-
-    output bookLevelType topBuyOut,
-    output bookLevelType topSellOut,
-
-    output orderDataType orderDataOut, // temp
-    output logic [64:0]  refDataOut);  // temp
+    input  logic        buySellIn);
 
     logic delExecValid, buySell;
     logic [15:0] locate;
@@ -55,9 +49,7 @@ module order_book_engine # (
         .locateOut(locate),
         .priceOut(price),
         .sharesOut(shares),
-        .buySellOut(buySell),
-        .orderDataOut(orderDataOut),
-        .refDataOut(refDataOut));
+        .buySellOut(buySell));
 
     ////////////////////////////////////////////
     // Order book
@@ -69,7 +61,7 @@ module order_book_engine # (
         .rstIn(rstIn),
         .clkIn(clkIn),
         .addValidIn(addValidIn),
-        .delExecValidIn(delValidIn),
+        .delExecValidIn(delExecValid),
         .locateIn(locateIn),
         .priceIn(priceIn),
         .sharesIn(sharesIn),
@@ -77,9 +69,7 @@ module order_book_engine # (
         .mapLocateIn(locate),
         .mapPriceIn(price),
         .mapSharesIn(shares),
-        .mapBuySellIn(buySell),
-        .topBuyOut(topBuyOut),
-        .topSellOut(topSellOut));
+        .mapBuySellIn(buySell));
 
 
 
