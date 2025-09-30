@@ -36,20 +36,20 @@ set_false_path -from [get_pins order_book_engine_inst/order_map_inst/ref_num_ram
 ###########################################
 # Book update logic has high level of logic (~12). New commands do not come in back to back so data has time to propagate.
 # Allowing for two cycles instead of pipelining design further keeps latency low, allows for concurrent inserts/shifts etc.
-set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/buyPriceLevelsRR_reg[*][*]/C]          -to [get_pins order_book_engine_inst/order_book_inst/buySidePriceRamR_reg[*][*]/D]
-set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/buyPriceLevelsRR_reg[*][*]/C]          -to [get_pins order_book_engine_inst/order_book_inst/buySidePriceRamR_reg[*][*]/D]
+# set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/buyPriceLevelsRR_reg[*][*]/C]          -to [get_pins order_book_engine_inst/order_book_inst/buySidePriceRamR_reg[*][*]/D]
+# set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/buyPriceLevelsRR_reg[*][*]/C]          -to [get_pins order_book_engine_inst/order_book_inst/buySidePriceRamR_reg[*][*]/D]
 
-set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/buyQuantityLevelsRR_reg[*][*]/C]       -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
-set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/buyQuantityLevelsRR_reg[*][*]/C]       -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+# set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/buyQuantityLevelsRR_reg[*][*]/C]       -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+# set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/buyQuantityLevelsRR_reg[*][*]/C]       -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
 
-set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/price_reg_inst/regsR_reg[1][*]/C]      -to [get_pins order_book_engine_inst/order_book_inst/buySidePriceRamR_reg[*][*]/D]
-set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/price_reg_inst/regsR_reg[1][*]/C]      -to [get_pins order_book_engine_inst/order_book_inst/buySidePriceRamR_reg[*][*]/D]
+# set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/price_reg_inst/regsR_reg[1][*]/C]      -to [get_pins order_book_engine_inst/order_book_inst/buySidePriceRamR_reg[*][*]/D]
+# set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/price_reg_inst/regsR_reg[1][*]/C]      -to [get_pins order_book_engine_inst/order_book_inst/buySidePriceRamR_reg[*][*]/D]
 
-set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/shares_reg_inst/regsR_reg[1][*]/C]     -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
-set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/shares_reg_inst/regsR_reg[1][*]/C]     -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+# set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/shares_reg_inst/regsR_reg[1][*]/C]     -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+# set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/shares_reg_inst/regsR_reg[1][*]/C]     -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
 
-set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/map_shares_reg_inst/regsR_reg[1][*]/C] -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
-set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/map_shares_reg_inst/regsR_reg[1][*]/C] -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+# set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/map_shares_reg_inst/regsR_reg[1][*]/C] -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+# set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/map_shares_reg_inst/regsR_reg[1][*]/C] -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
 
-set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/buyMatchIdxR_reg[*]/C]                 -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
-set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/buyMatchIdxR_reg[*]/C]                 -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+# set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/buyMatchIdxR_reg[*]/C]                 -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+# set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/buyMatchIdxR_reg[*]/C]                 -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
