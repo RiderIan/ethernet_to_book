@@ -54,9 +54,9 @@ module order_book_engine # (
     ////////////////////////////////////////////
     // Order book
     ////////////////////////////////////////////
-    (* keep = "true", dont_touch = "true" *)
+    (* use_dsp = "yes" *)
     order_book # (
-        .ORDER_BOOK_DEPTH(ORDER_BOOK_DEPTH))
+        .DEPTH(ORDER_BOOK_DEPTH))
     order_book_inst (
         .rstIn(rstIn),
         .clkIn(clkIn),
