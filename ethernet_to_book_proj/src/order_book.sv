@@ -15,7 +15,7 @@ import pkg::*;
 
 (* keep = "true", dont_touch = "true" *)
 module order_book # (
-    parameter int ORDER_BOOK_DEPTH)(
+    parameter int DEPTH)(
 
     input logic         rstIn,
     input logic         clkIn,
@@ -33,18 +33,30 @@ module order_book # (
     input logic [31:0]  mapSharesIn,
     input logic         mapBuySellIn);
 
-    localparam int ADDR_BITS = $clog2(ORDER_BOOK_DEPTH);
+    localparam int ADDR_BITS = $clog2(DEPTH);
 
-    logic [31:0]  priceLevelsR    [1:ORDER_BOOK_DEPTH];
-    logic [31:0]  quantLevelsR    [1:ORDER_BOOK_DEPTH];
-    logic [31:0]  addPriceLevelsR [1:ORDER_BOOK_DEPTH];
-    logic [31:0]  addQuantLevelsR [1:ORDER_BOOK_DEPTH];
-    logic [31:0]  delPriceLevelsR [1:ORDER_BOOK_DEPTH];
-    logic [31:0]  delQuantLevelsR [1:ORDER_BOOK_DEPTH];
+    // Buy side book
+    logic [31:0]  buyPriceLevelsR  [1:DEPTH];
+    logic [31:0]  buyQuantLevelsR  [1:DEPTH];
+    logic [31:0]  bAddPriceLevelsR [1:DEPTH];
+    logic [31:0]  bAddQuantLevelsR [1:DEPTH];
+    logic [31:0]  bDelPriceLevelsR [1:DEPTH];
+    logic [31:0]  bDelQuantLevelsR [1:DEPTH];
+
+    // Sell Side book
+    logic [31:0]  sellPriceLevelsR [1:DEPTH];
+    logic [31:0]  sellQuantLevelsR [1:DEPTH];
+    logic [31:0]  sAddPriceLevelsR [1:DEPTH];
+    logic [31:0]  sAddQuantLevelsR [1:DEPTH];
+    logic [31:0]  sDelPriceLevelsR [1:DEPTH];
+    logic [31:0]  sDelQuantLevelsR [1:DEPTH];
+
+    logic [31:0]  sharesSumR        [1:DEPTH];
+    logic [16:0]  sharesDiffR       [1:DEPTH];
 
     logic [31:0]  priceR, sharesR, mapPriceR, mapSharesR;
-    logic [ORDER_BOOK_DEPTH:1] priceMatchR, quantMatchR, priceGreatR, mapPriceMatchR, mapQuantMatchR, mapPriceGreatR, addWrEnR, delWrEnR;
-    logic addValidR, delExecValidR, bookUpdatedR, bookUpdatedRR, buySellR, mapBuySellR;
+    logic [DEPTH:1] priceMatchR, priceGreatR, mapPriceMatchR, mapQuantMatchR, mapPriceLessR, buyAddWrEnR, buyDelWrEnR;
+    logic addValidR, delExecValidR, buyUpdatedR, sellUpdatedR, buySellR, mapBuySellR, anyPriceMatchR, anyMapPriceMatchR, anyMapQuantMatchR;;
 
     ////////////////////////////////////////////
     // Input regs
@@ -68,40 +80,45 @@ module order_book # (
         mapBuySellR <= mapBuySellIn;
     end
 
+    always_comb begin : match_checks
+        anyPriceMatchR    <= |priceMatchR;
+        anyMapPriceMatchR <= |mapPriceMatchR;
+        anyMapQuantMatchR <= |mapQuantMatchR;
+    end
+
     ////////////////////////////////////////////
     // Top node (top of book)
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : top_compares
-        priceMatchR[1]    <= (priceLevelsR[1] == priceIn);
-        quantMatchR[1]    <= (quantLevelsR[1] >= sharesIn);
-        priceGreatR[1]    <= (priceLevelsR[1] <  sharesIn);
+        priceMatchR[1]    <= (buyPriceLevelsR[1] == priceIn);
+        priceGreatR[1]    <= (buyPriceLevelsR[1] <  priceIn);
 
-        mapPriceMatchR[1] <= (priceLevelsR[1] == mapPriceIn);
-        mapQuantMatchR[1] <= (quantLevelsR[1] >= mapSharesIn);
-        mapPriceGreatR[1] <= (priceLevelsR[1] <  mapSharesIn);
+        mapPriceMatchR[1] <= (buyPriceLevelsR[1] == mapPriceIn);
+        mapQuantMatchR[1] <= (buyQuantLevelsR[1] <= mapSharesIn);
+
+        sharesSumR[1]     <= buyQuantLevelsR[1] + sharesIn;
+        sharesDiffR[1]    <= buyQuantLevelsR[1] - mapSharesIn;
     end
 
     // Increment or insert
     always_ff @(posedge clkIn) begin : top_add_order
         if (rstIn) begin
-            addWrEnR[1]        <= '0;
-            addPriceLevelsR[1] <= '0;
-            addQuantLevelsR[1] <= '0;
+            bAddPriceLevelsR[1] <= '0;
+            bAddQuantLevelsR[1] <= '0;
+            buyAddWrEnR[1]        <= '0;
         end else begin
-            addWrEnR[1]        <= 1'b0;
-            addPriceLevelsR[1] <= priceLevelsR[1];
-            addQuantLevelsR[1] <= quantLevelsR[1];
+            bAddPriceLevelsR[1] <= buyPriceLevelsR[1];
+            bAddQuantLevelsR[1] <= buyQuantLevelsR[1];
+            buyAddWrEnR[1]        <= 1'b0;
 
             if (addValidR & buySellR) begin
-                if (priceMatchR[1]) begin
-                    addQuantLevelsR[1] <= quantLevelsR[1] + sharesR;
-                    addWrEnR[1]        <= 1'b1;
-                end
-
                 if (priceGreatR[1]) begin
-                    addPriceLevelsR[1] <= priceR;
-                    addQuantLevelsR[1] <= sharesR;
-                    addWrEnR[1]        <= 1'b1;
+                    bAddPriceLevelsR[1] <= priceR;
+                    bAddQuantLevelsR[1] <= sharesR;
+                    buyAddWrEnR[1]      <= 1'b1;
+                end else if (priceMatchR[1]) begin
+                    bAddQuantLevelsR[1] <= sharesSumR[1];
+                    buyAddWrEnR[1]      <= 1'b1;
                 end
             end
         end
@@ -110,23 +127,23 @@ module order_book # (
     // Decrement or delete and shift up
     always_ff @(posedge clkIn) begin : top_del_exec_order
         if (rstIn) begin
-            delWrEnR[1]        <= '0;
-            delPriceLevelsR[1] <= '0;
-            delQuantLevelsR[1] <= '0;
+            buyDelWrEnR[1]        <= '0;
+            bDelPriceLevelsR[1] <= '0;
+            bDelQuantLevelsR[1] <= '0;
         end else begin
-            delWrEnR[1]        <= 1'b0;
-            delPriceLevelsR[1] <= priceLevelsR[1];
-            delQuantLevelsR[1] <= quantLevelsR[1];
+            buyDelWrEnR[1]        <= 1'b0;
+            bDelPriceLevelsR[1] <= buyPriceLevelsR[1];
+            bDelQuantLevelsR[1] <= buyQuantLevelsR[1];
 
             if (delExecValidR & mapBuySellR) begin
                 if (mapPriceMatchR[1]) begin
                     if (mapQuantMatchR[1]) begin
-                        delPriceLevelsR[1] <= priceLevelsR[2];
-                        delQuantLevelsR[1] <= quantLevelsR[2];
-                        delWrEnR[1]        <= 1'b1;
+                        bDelPriceLevelsR[1] <= buyPriceLevelsR[2];
+                        bDelQuantLevelsR[1] <= buyQuantLevelsR[2];
+                        buyDelWrEnR[1]      <= 1'b1;
                     end else begin
-                        delQuantLevelsR[1]  <= quantLevelsR[1] - mapSharesR;
-                        delWrEnR[1]         <= 1'b1;
+                        bDelQuantLevelsR[1] <= sharesDiffR[1];
+                        buyDelWrEnR[1]      <= 1'b1;
                     end
                 end
             end
@@ -138,45 +155,45 @@ module order_book # (
     ////////////////////////////////////////////
     genvar i;
     generate
-        for (i = ORDER_BOOK_DEPTH - 1; i > 1; i--) begin : middle_nodes_gen
+        for (i = DEPTH - 1; i > 1; i--) begin : middle_nodes_gen
 
             always_ff @(posedge clkIn) begin : common_compares
-                priceMatchR[i]    <= (priceLevelsR[i] == priceIn);
-                quantMatchR[i]    <= (quantLevelsR[i] >= sharesIn);
-                priceGreatR[i]    <= (priceLevelsR[i] <  sharesIn);
+                priceMatchR[i]    <= (buyPriceLevelsR[i] == priceIn);
+                priceGreatR[i]    <= (buyPriceLevelsR[i] <  priceIn);
 
-                mapPriceMatchR[i] <= (priceLevelsR[i] == mapPriceIn);
-                mapQuantMatchR[i] <= (quantLevelsR[i] >= mapSharesIn);
-                mapPriceGreatR[i] <= (priceLevelsR[i] <  mapSharesIn);
+                mapPriceMatchR[i] <= (buyPriceLevelsR[i] == mapPriceIn);
+                mapQuantMatchR[i] <= (buyQuantLevelsR[i] <= mapSharesIn);
+                mapPriceLessR[i]  <= (buyPriceLevelsR[i] <= mapPriceIn);
+
+                sharesSumR[i]     <= buyQuantLevelsR[i] + sharesIn;
+                sharesDiffR[i]    <= buyQuantLevelsR[1] - mapSharesIn;
             end
 
             // Increment or insert and shift down
             always_ff @(posedge clkIn) begin : add_order
                 if (rstIn) begin
-                    addWrEnR[i]        <= '0;
-                    addPriceLevelsR[i] <= '0;
-                    addQuantLevelsR[i] <= '0;
+                    bAddPriceLevelsR[i] <= '0;
+                    bAddQuantLevelsR[i] <= '0;
+                    buyAddWrEnR[i]      <= '0;
                 end else begin
-                    addWrEnR[i]        <= 1'b0;
-                    addPriceLevelsR[i] <= priceLevelsR[i];
-                    addQuantLevelsR[i] <= quantLevelsR[i];
+                    bAddPriceLevelsR[i] <= buyPriceLevelsR[i];
+                    bAddQuantLevelsR[i] <= buyQuantLevelsR[i];
+                    buyAddWrEnR[i]      <= 1'b0;
 
                     if (addValidR & buySellR) begin
                         if (priceMatchR[i]) begin
-                            addQuantLevelsR[i] <= quantLevelsR[i] + sharesR;
-                            addWrEnR[i]        <= 1'b1;
-                        end
-
-                        if (priceGreatR[i] & priceGreatR[i-1]) begin
-                            addPriceLevelsR[i] <= priceLevelsR[i-1];
-                            addQuantLevelsR[i] <= quantLevelsR[i-1];
-                            addWrEnR[i]        <= 1'b1;
-                        end
-
-                        if (priceGreatR[i] & ~priceGreatR[i-1]) begin
-                            addPriceLevelsR[i] <= priceR;
-                            addQuantLevelsR[i] <= sharesR;
-                            addWrEnR[i]        <= 1'b1;
+                            bAddQuantLevelsR[i] <= sharesSumR[i];
+                            buyAddWrEnR[i]      <= 1'b1;
+                        end else if (~anyPriceMatchR) begin
+                            if (priceGreatR[i] & priceGreatR[i-1]) begin
+                                bAddPriceLevelsR[i] <= buyPriceLevelsR[i-1];
+                                bAddQuantLevelsR[i] <= buyQuantLevelsR[i-1];
+                                buyAddWrEnR[i]      <= 1'b1;
+                            end else if (priceGreatR[i] & ~priceGreatR[i-1]) begin
+                                bAddPriceLevelsR[i] <= priceR;
+                                bAddQuantLevelsR[i] <= sharesR;
+                                buyAddWrEnR[i]      <= 1'b1;
+                            end
                         end
                     end
                 end
@@ -185,24 +202,22 @@ module order_book # (
             // Decrement or delete and shift up
             always_ff @(posedge clkIn) begin : del_exec_order
                 if (rstIn) begin
-                    delWrEnR[i]        <= '0;
-                    delPriceLevelsR[i] <= '0;
-                    delQuantLevelsR[i] <= '0;
+                    buyDelWrEnR[i]        <= '0;
+                    bDelPriceLevelsR[i] <= '0;
+                    bDelQuantLevelsR[i] <= '0;
                 end else begin
-                    delWrEnR[i]        <= 1'b0;
-                    delPriceLevelsR[i] <= priceLevelsR[i];
-                    delQuantLevelsR[i] <= quantLevelsR[i];
+                    buyDelWrEnR[i]        <= 1'b0;
+                    bDelPriceLevelsR[i] <= buyPriceLevelsR[i];
+                    bDelQuantLevelsR[i] <= buyQuantLevelsR[i];
 
                     if (delExecValidR & mapBuySellR) begin
-                        if (mapPriceMatchR[i]) begin
-                            if (mapQuantMatchR[i]) begin
-                                delPriceLevelsR[i] <= priceLevelsR[i+1];
-                                delQuantLevelsR[i] <= quantLevelsR[i+1];
-                                delWrEnR[i]        <= 1'b1;
-                            end else begin
-                                delQuantLevelsR[i] <= quantLevelsR[i] - mapSharesR;
-                                delWrEnR[i]         <= 1'b1;
-                            end
+                        if (anyMapPriceMatchR & anyMapQuantMatchR & mapPriceLessR[i]) begin
+                            bDelPriceLevelsR[i] <= buyPriceLevelsR[i+1];
+                            bDelQuantLevelsR[i] <= bDelQuantLevelsR[i+1];
+                            buyDelWrEnR[i]        <= 1'b1;
+                        end else if (mapPriceMatchR[i]) begin
+                            bDelQuantLevelsR[i] <= sharesDiffR[i];
+                            buyDelWrEnR[i]        <= 1'b1;
                         end
                     end
                 end
@@ -215,42 +230,42 @@ module order_book # (
     // Bottom node
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : bottom_compares
-        priceMatchR[ORDER_BOOK_DEPTH]    <= (priceLevelsR[ORDER_BOOK_DEPTH] == priceIn);
-        quantMatchR[ORDER_BOOK_DEPTH]    <= (quantLevelsR[ORDER_BOOK_DEPTH] >= sharesIn);
-        priceGreatR[ORDER_BOOK_DEPTH]    <= (priceLevelsR[ORDER_BOOK_DEPTH] <  sharesIn);
+        priceMatchR[DEPTH]    <= (buyPriceLevelsR[DEPTH] == priceIn);
+        priceGreatR[DEPTH]    <= (buyPriceLevelsR[DEPTH] <  priceIn);
 
-        mapPriceMatchR[ORDER_BOOK_DEPTH] <= (priceLevelsR[ORDER_BOOK_DEPTH] == mapPriceIn);
-        mapQuantMatchR[ORDER_BOOK_DEPTH] <= (quantLevelsR[ORDER_BOOK_DEPTH] >= mapSharesIn);
-        mapPriceGreatR[ORDER_BOOK_DEPTH] <= (priceLevelsR[ORDER_BOOK_DEPTH] <  mapSharesIn);
+        mapPriceMatchR[DEPTH] <= (buyPriceLevelsR[DEPTH] == mapPriceIn);
+        mapQuantMatchR[DEPTH] <= (buyQuantLevelsR[DEPTH] <= mapSharesIn);
+        mapPriceLessR[DEPTH]  <= (buyPriceLevelsR[DEPTH] <  mapPriceIn);
+
+        sharesSumR[DEPTH]     <= buyQuantLevelsR[DEPTH] + sharesIn;
+        sharesDiffR[DEPTH]    <= buyQuantLevelsR[DEPTH] - mapSharesIn;
     end
 
     // Increment or insert and shift down
     always_ff @(posedge clkIn) begin : bottom_add_order
         if (rstIn) begin
-            addWrEnR[ORDER_BOOK_DEPTH]        <= '0;
-            addPriceLevelsR[ORDER_BOOK_DEPTH] <= '0;
-            addQuantLevelsR[ORDER_BOOK_DEPTH] <= '0;
+            bAddPriceLevelsR[DEPTH] <= '0;
+            bAddQuantLevelsR[DEPTH] <= '0;
+            buyAddWrEnR[DEPTH]      <= '0;
         end else begin
-            addWrEnR[ORDER_BOOK_DEPTH]        <= 1'b0;
-            addPriceLevelsR[ORDER_BOOK_DEPTH] <= priceLevelsR[ORDER_BOOK_DEPTH];
-            addQuantLevelsR[ORDER_BOOK_DEPTH] <= quantLevelsR[ORDER_BOOK_DEPTH];
+            bAddPriceLevelsR[DEPTH] <= buyPriceLevelsR[DEPTH];
+            bAddQuantLevelsR[DEPTH] <= buyQuantLevelsR[DEPTH];
+            buyAddWrEnR[DEPTH]      <= 1'b0;
 
             if (addValidR & buySellR) begin
-                if (priceMatchR[ORDER_BOOK_DEPTH]) begin
-                    addQuantLevelsR[ORDER_BOOK_DEPTH] <= quantLevelsR[ORDER_BOOK_DEPTH] + sharesR;
-                    addWrEnR[ORDER_BOOK_DEPTH]        <= 1'b1;
-                end
-
-                if (priceGreatR[ORDER_BOOK_DEPTH] & priceGreatR[ORDER_BOOK_DEPTH-1]) begin
-                    addPriceLevelsR[ORDER_BOOK_DEPTH] <= priceLevelsR[ORDER_BOOK_DEPTH-1];
-                    addQuantLevelsR[ORDER_BOOK_DEPTH] <= quantLevelsR[ORDER_BOOK_DEPTH-1];
-                    addWrEnR[ORDER_BOOK_DEPTH]        <= 1'b1;
-                end
-
-                if (priceGreatR[ORDER_BOOK_DEPTH] & ~priceGreatR[ORDER_BOOK_DEPTH-1]) begin
-                    addPriceLevelsR[ORDER_BOOK_DEPTH] <= priceR;
-                    addQuantLevelsR[ORDER_BOOK_DEPTH] <= sharesR;
-                    addWrEnR[ORDER_BOOK_DEPTH]        <= 1'b1;
+                if (priceMatchR[DEPTH]) begin
+                    bAddQuantLevelsR[DEPTH] <= sharesSumR[DEPTH];
+                    buyAddWrEnR[DEPTH]      <= 1'b1;
+                end else if (~anyPriceMatchR) begin
+                    if (priceGreatR[DEPTH] & priceGreatR[DEPTH-1]) begin
+                        bAddPriceLevelsR[DEPTH] <= buyPriceLevelsR[DEPTH-1];
+                        bAddQuantLevelsR[DEPTH] <= buyQuantLevelsR[DEPTH-1];
+                        buyAddWrEnR[DEPTH]      <= 1'b1;
+                    end else if (priceGreatR[DEPTH] & ~priceGreatR[DEPTH-1]) begin
+                        bAddPriceLevelsR[DEPTH] <= priceR;
+                        bAddQuantLevelsR[DEPTH] <= sharesR;
+                        buyAddWrEnR[DEPTH]      <= 1'b1;
+                    end
                 end
             end
         end
@@ -259,23 +274,21 @@ module order_book # (
     // Decrement or delete
     always_ff @(posedge clkIn) begin : bottom_del_exec_order
         if (rstIn) begin
-            delWrEnR[ORDER_BOOK_DEPTH]        <= '0;
-            delPriceLevelsR[ORDER_BOOK_DEPTH] <= '0;
-            delQuantLevelsR[ORDER_BOOK_DEPTH] <= '0;
+            buyDelWrEnR[DEPTH]        <= '0;
+            bDelPriceLevelsR[DEPTH] <= '0;
+            bDelQuantLevelsR[DEPTH] <= '0;
         end else begin
-            delWrEnR[ORDER_BOOK_DEPTH]        <= 1'b0;
-            delPriceLevelsR[ORDER_BOOK_DEPTH] <= priceLevelsR[ORDER_BOOK_DEPTH];
-            delQuantLevelsR[ORDER_BOOK_DEPTH] <= quantLevelsR[ORDER_BOOK_DEPTH];
+            buyDelWrEnR[DEPTH]        <= 1'b0;
+            bDelPriceLevelsR[DEPTH] <= buyPriceLevelsR[DEPTH];
+            bDelQuantLevelsR[DEPTH] <= buyQuantLevelsR[DEPTH];
 
             if (delExecValidR & mapBuySellR) begin
-                if (mapPriceMatchR[ORDER_BOOK_DEPTH]) begin
-                    if (mapQuantMatchR[ORDER_BOOK_DEPTH]) begin
-                        delPriceLevelsR[ORDER_BOOK_DEPTH] <= '0;
-                        delQuantLevelsR[ORDER_BOOK_DEPTH] <= '0;
-                        delWrEnR[ORDER_BOOK_DEPTH]        <= 1'b1;
+                if (mapPriceMatchR[DEPTH]) begin
+                    if (mapQuantMatchR[DEPTH]) begin
+                        bDelPriceLevelsR[DEPTH] <= '0;
+                        bDelQuantLevelsR[DEPTH] <= '0;
                     end else begin
-                        delQuantLevelsR[ORDER_BOOK_DEPTH] <= quantLevelsR[ORDER_BOOK_DEPTH] - mapSharesR;
-                        delWrEnR[ORDER_BOOK_DEPTH]        <= 1'b1;
+                        bDelQuantLevelsR[DEPTH] <= sharesDiffR[DEPTH];
                     end
                 end
             end
@@ -287,36 +300,38 @@ module order_book # (
     ////////////////////////////////////////////
     always_ff @(posedge clkIn) begin : buy_mux
         if (rstIn) begin
-            priceLevelsR <= '{default:'0};
-            quantLevelsR <= '{default:'0};
+            buyPriceLevelsR <= '{default:'0};
+            buyQuantLevelsR <= '{default:'0};
         end else begin
-            if (|addWrEnR) begin
-                priceLevelsR <= addPriceLevelsR;
-                quantLevelsR <= addQuantLevelsR;
-            end else if (|delWrEnR) begin
-                priceLevelsR <= delPriceLevelsR;
-                quantLevelsR <= delQuantLevelsR;
+            if (|buyAddWrEnR) begin
+                buyPriceLevelsR <= bAddPriceLevelsR;
+                buyQuantLevelsR <= bAddQuantLevelsR;
+            end else if (|buyDelWrEnR) begin
+                buyPriceLevelsR <= bDelPriceLevelsR;
+                buyQuantLevelsR <= bDelQuantLevelsR;
             end
         end
     end
 
 
 
-    // always_ff @(posedge clkIn) begin : ila_trig_reg
-    //     if (rstIn) begin
-    //         bookUpdatedR  <= 1'b0;
-    //         bookUpdatedRR <= 1'b0;
-    //     end else begin
-    //         bookUpdatedR  <= addValidDlyR | delExecValidDlyR;
-    //         bookUpdatedRR <= bookUpdatedR;
-    //     end
-    // end
+    ////////////////////////////////////////////
+    // Hardware debug
+    ////////////////////////////////////////////
+    always_ff @(posedge clkIn) begin : ila_trig_reg
+        if (rstIn) begin
+            buyUpdatedR  <= 1'b0;
+            sellUpdatedR <= 1'b0;
+        end else begin
+            buyUpdatedR  <= (|buyAddWrEnR) | (|buyDelWrEnR);
+            sellUpdatedR <= 1'b0;
+        end
+    end
 
-    // TODO: replace with actual signals
     top_of_book_ila book_ila_inst (
         .clk(clkIn),
-        .trig_in(addValidR),
-        .probe0({priceLevelsR[2], quantLevelsR[2]}),
-        .probe1(addWrEnR[2]));
+        .trig_in(buyUpdatedR|sellUpdatedR),
+        .probe0({buyPriceLevelsR[1], buyQuantLevelsR[1]}),
+        .probe1({sellPriceLevelsR[1], sellQuantLevelsR[1]}));
 
 endmodule

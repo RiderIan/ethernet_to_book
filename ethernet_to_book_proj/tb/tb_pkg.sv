@@ -388,6 +388,28 @@ package tb_pkg;
         assert(execIf.refNum  == execOrder.refNum)   else $fatal ("Incorrect refNum received : %H Expected: %H", execIf.refNum,  execOrder.refNum);
     endtask
 
+    function automatic check_price_levels (
+        input logic [31:0] priceLevels [],
+        input logic [31:0] expectedLevels []);
+
+        for (int i = $left(priceLevels); i <= $right(priceLevels); i++) begin
+            assert(priceLevels[i] == expectedLevels[i]) else $fatal("Price level : %D incorrect. Received: %H Expected: %H", (i + 1), priceLevels[i], expectedLevels[i]);
+            $display("Correct price level ", (i + 1), " received: ", priceLevels[i]);
+        end
+
+    endfunction
+
+    function automatic check_quant_levels (
+        input logic [31:0] quantLevels [],
+        input logic [31:0] expectedLevels []);
+
+        for (int i = $left(quantLevels); i <= $right(quantLevels); i++) begin
+            assert(quantLevels[i] == expectedLevels[i]) else $fatal("Quant level : %D incorrect. Received: %H Expected: %H", (i + 1), quantLevels[i], expectedLevels[i]);
+            $display("Correct quant level ", (i + 1), " received: ", quantLevels[i]);
+        end
+
+    endfunction
+
     function automatic logic [15:0] ip_header_chksum_calc (
         input ipHeaderType ipHeader);
 
