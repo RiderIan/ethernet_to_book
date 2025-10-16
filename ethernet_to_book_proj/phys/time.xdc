@@ -53,3 +53,6 @@ set_false_path -from [get_pins order_book_engine_inst/order_map_inst/ref_num_ram
 
 # set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_book_inst/buyMatchIdxR_reg[*]/C]                 -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
 # set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_book_inst/buyMatchIdxR_reg[*]/C]                 -to [get_pins order_book_engine_inst/order_book_inst/buySideQuantityRamR_reg[*][*]/D]
+
+set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[1][*]/C]        -to [get_pins order_book_engine_inst/order_book_inst/sharesDiffR_reg[*][*]/D]
+set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[1][*]/C]        -to [get_pins order_book_engine_inst/order_book_inst/sharesDiffR_reg[*][*]/D]
