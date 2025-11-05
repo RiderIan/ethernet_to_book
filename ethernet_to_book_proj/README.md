@@ -52,5 +52,5 @@ A low-latency FPGA implementation of 1G networking stack for processing UDP pack
 - This approach was taken to reduce the high level of logic at each "node" (price level) to handle add orders (increment or insert and shift down) and del/exec orders (decrement or delete and shift up).
 - The inlcuded figure below shows a simplified block diagram of this multi-book system.
 
-!(docs\multi_book_system.png)
+!([alt text] multi_book_system.png)
 
