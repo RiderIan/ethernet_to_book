@@ -46,3 +46,11 @@ A low-latency FPGA implementation of 1G networking stack for processing UDP pack
 - Target Artix 7 FPGA. Diligent Nexy video board will be used for hardware verification (in progress).
 - System Verilog for synthesizable code and test benches.
 
+## Book Design
+### Multi Book System
+- A multi book system was implemented where two separate books per side are maintained. One book handles add order logic while the other book handles delete and execute order logic. When on book is updated it's contents are written to the master book. The master book then updated both add and delete books to keep them current.
+- This approach was taken to reduce the high level of logic at each "node" (price level) to handle add orders (increment or insert and shift down) and del/exec orders (decrement or delete and shift up).
+- The inlcuded figure below shows a simplified block diagram of this multi-book system.
+
+!(docs\multi_book_system.png)
+
