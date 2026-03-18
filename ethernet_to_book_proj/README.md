@@ -1,7 +1,7 @@
 # FPGA 1G Ethernet to Book Engine for ITCH Market Data
 
 ## Overview
-A low-latency FPGA implementation of 1G networking stack for processing UDP packets containing ITCH market data and maintaining an on fabric order book. Add, delete, and order executed messages are supported. The order map is fully functional and the buy side of the book is complete. Sell side, deeper verification, and hardware testing is in progress. Zero IP was used in this project (except for a Xilinx IP AFIFO which was used only to benchmark a custom CDC solution). **This project is in progress and is not a finished/polished work**
+A low-latency FPGA implementation of 1G networking stack for processing UDP packets containing ITCH market data and maintaining an on fabric order book. Add, delete, and order executed messages are supported.
 
 ## Features
 - **Custom MAC**
