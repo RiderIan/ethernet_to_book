@@ -138,8 +138,8 @@ module ethernet_to_book_top (
     // Order book/map engine
     ////////////////////////////////////////////
     order_book_engine # (
-        .ORDER_MAP_DEPTH(512), // Must be power of two
-        .ORDER_BOOK_DEPTH(3))
+        .ORDER_MAP_DEPTH(2048), // Must be power of two
+        .ORDER_BOOK_DEPTH(5))
     order_book_engine_inst (
         .rstIn(rst250),
         .clkIn(clk250),
