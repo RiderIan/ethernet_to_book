@@ -29,13 +29,50 @@ set_false_path  -through [get_cells -hierarchical -filter {NAME =~ "*xpm_fifo_as
 # Other false paths
 ###########################################
 # Order map is synchronous dual port ram. Input data A to addr B was being timed but this path can be treated as async
-set_false_path -from [get_pins order_book_engine_inst/order_map_inst/ref_num_ram/regsR_reg[*][*]/C] -to [get_pins order_book_engine_inst/order_map_inst/addrBR_reg[*]/CE]
+set_false_path -from [get_pins {order_book_engine_inst/order_map_inst/ref_num_ram/regsR_reg[*][*]/C}] -to [get_pins {order_book_engine_inst/order_map_inst/addrBR_reg[*]/CE}]
 
 ###########################################
-# Multi-cycle paths
+# Multi-cycle paths (These are subtractions where both operands are ready 2 cycles before they are sampled)
 ###########################################
-set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[1][*]/C]        -to [get_pins order_book_engine_inst/order_book_inst/bSharesDiffR_reg[*][*]/D]
-set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[1][*]/C]        -to [get_pins order_book_engine_inst/order_book_inst/bSharesDiffR_reg[*][*]/D]
+set_multicycle_path 2 -setup \
+    -from [get_pins {order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C}] \
+    -to   [get_pins {order_book_engine_inst/order_book_inst/bSharesDiffR_reg[*][*]/D}]
 
-set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[1][*]/C]        -to [get_pins order_book_engine_inst/order_book_inst/sSharesDiffR_reg[*][*]/D]
-set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[1][*]/C]        -to [get_pins order_book_engine_inst/order_book_inst/sSharesDiffR_reg[*][*]/D]
+set_multicycle_path 1 -hold -end \
+    -from [get_pins {order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C}] \
+    -to   [get_pins {order_book_engine_inst/order_book_inst/bSharesDiffR_reg[*][*]/D}]
+
+set_multicycle_path 2 -setup \
+    -from [get_pins {order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C}] \
+    -to   [get_pins {order_book_engine_inst/order_book_inst/middle_nodes_gen[*].bSharesDiffR_reg[*][*]/D}]
+
+set_multicycle_path 1 -hold -end \
+    -from [get_pins {order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C}] \
+    -to   [get_pins {order_book_engine_inst/order_book_inst/middle_nodes_gen[*].bSharesDiffR_reg[*][*]/D}]
+
+set_multicycle_path 2 -setup \
+    -from [get_pins {order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C}] \
+    -to   [get_pins {order_book_engine_inst/order_book_inst/middle_nodes_gen[*].sSharesDiffR_reg[*][*]/D}]
+
+set_multicycle_path 1 -hold -end \
+    -from [get_pins {order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C}] \
+    -to   [get_pins {order_book_engine_inst/order_book_inst/middle_nodes_gen[*].sSharesDiffR_reg[*][*]/D}]
+
+set_multicycle_path 2 -setup \
+    -from [get_pins {order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C}] \
+    -to   [get_pins {order_book_engine_inst/order_book_inst/sSharesDiffR_reg[*][*]/D}]
+
+set_multicycle_path 1 -hold -end \
+    -from [get_pins {order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C}] \
+    -to   [get_pins {order_book_engine_inst/order_book_inst/sSharesDiffR_reg[*][*]/D}]
+
+# set_multicycle_path 2 -setup     -from [get_pins order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C]        -to [get_pins order_book_engine_inst/order_book_inst/sSharesDiffR_reg[*][*]/D]
+# set_multicycle_path 1 -hold -end -from [get_pins order_book_engine_inst/order_map_inst/shares_out_inst/regsR_reg[*][*]/C]        -to [get_pins order_book_engine_inst/order_book_inst/sSharesDiffR_reg[*][*]/D]
+
+###########################################
+# Weird path failing after re-booting this project on Vivado 2025.2
+# Also many <hidden> to <hidden> paths failing :)
+###########################################
+set_false_path \
+    -from [get_pins {dbg_hub/inst/BSCANID.u_xsdbm_id/CORE_XSDB.UUT_MASTER/U_ICON_INTERFACE/U_CMD6_WR/U_WR_FIFO/SUBCORE_FIFO.xsdbm_v3_0_5_wrfifo_inst/inst_fifo_gen/gconvfifo.rf/grf.rf/gntv_or_sync_fifo.gl0.rd/gras.rsts/ram_empty_i_reg/C}] \
+    -to   [get_pins {dbg_hub/inst/BSCANID.u_xsdbm_id/CORE_XSDB.UUT_MASTER/U_XSDB_BUS_CONTROLLER/sl_dwe_r_reg[0]/D}]

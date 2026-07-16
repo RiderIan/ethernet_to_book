@@ -299,12 +299,12 @@ module order_book # (
             // Increment or insert and shift down
             always_ff @(posedge clkIn) begin : sell_add_order
                 if (rstIn) begin
-                    sDelPriceLevelsR[i] <= '1;
-                    sDelQuantLevelsR[i] <= '1;
+                    sAddPriceLevelsR[i] <= '1;
+                    sAddQuantLevelsR[i] <= '1;
                     sAddWrEnR[i]        <= '0;
                 end else begin
-                    sDelPriceLevelsR[i] <= sellPriceLevelsR[i];
-                    sDelQuantLevelsR[i] <= sellQuantLevelsR[i];
+                    sAddPriceLevelsR[i] <= sellPriceLevelsR[i];
+                    sAddQuantLevelsR[i] <= sellQuantLevelsR[i];
                     sAddWrEnR[i]        <= '0;
 
                     if (addValidR & ~buySellR) begin

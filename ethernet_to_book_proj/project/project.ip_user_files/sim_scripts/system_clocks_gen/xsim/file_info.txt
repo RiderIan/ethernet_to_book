@@ -1,0 +1,3 @@
+system_clocks_gen_clk_wiz.v,verilog,xil_defaultlib,../../../../project.gen/sources_1/ip/system_clocks_gen/system_clocks_gen_clk_wiz.v,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+system_clocks_gen.v,verilog,xil_defaultlib,../../../../project.gen/sources_1/ip/system_clocks_gen/system_clocks_gen.v,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+glbl.v,Verilog,xil_defaultlib,glbl.v

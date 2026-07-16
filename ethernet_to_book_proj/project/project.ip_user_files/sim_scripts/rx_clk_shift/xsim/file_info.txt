@@ -1,0 +1,3 @@
+rx_clk_shift_clk_wiz.v,verilog,xil_defaultlib,../../../../project.gen/sources_1/ip/rx_clk_shift/rx_clk_shift_clk_wiz.v,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+rx_clk_shift.v,verilog,xil_defaultlib,../../../../project.gen/sources_1/ip/rx_clk_shift/rx_clk_shift.v,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+glbl.v,Verilog,xil_defaultlib,glbl.v

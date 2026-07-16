@@ -1,0 +1,2 @@
+top_of_book_ila.v,verilog,xil_defaultlib,../../../../project.gen/sources_1/ip/top_of_book_ila/sim/top_of_book_ila.v,incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../../project.gen/sources_1/ip/top_of_book_ila/hdl/verilog"
+glbl.v,Verilog,xil_defaultlib,glbl.v

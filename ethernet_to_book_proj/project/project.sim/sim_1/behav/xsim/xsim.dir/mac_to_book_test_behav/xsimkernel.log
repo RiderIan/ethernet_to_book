@@ -1,0 +1,7 @@
+Running: xsim.dir/mac_to_book_test_behav/xsimk -simmode gui -wdb mac_to_book_test_behav.wdb -simrunnum 0 -socket 48291
+Design successfully loaded
+Design Loading Memory Usage: 198624 KB (Peak: 198632 KB)
+Design Loading CPU Usage: 470 ms
+Simulation completed
+Simulation Memory Usage: 280880 KB (Peak: 337892 KB)
+Simulation CPU Usage: 60960 ms

@@ -1,0 +1,1 @@
+--incr --debug "typical" --relax --mt "8" -L "xil_defaultlib" -L "uvm" -L "unisims_ver" -L "unimacro_ver" -L "secureip" -L "xpm" --snapshot "ethernet_to_book_top_behav" "xil_defaultlib.ethernet_to_book_top" "xil_defaultlib.glbl" -log "elaborate.log" 

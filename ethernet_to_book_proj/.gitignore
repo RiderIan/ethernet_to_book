@@ -1,1 +1,4 @@
 proj/
+vivado*
+.Xil
+xvlog*

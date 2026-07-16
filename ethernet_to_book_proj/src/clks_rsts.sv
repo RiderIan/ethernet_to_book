@@ -54,7 +54,7 @@ module clks_rsts(
         .clk_in1(clkIn));             // 100Mhz reference clock
 
     rx_clk_shift mmcm1_inst (
-        .clk_out1(rxClkLcl),          // 125Mhz clock delayed for mgii rx logic
+        .clk_out1(rxClkLcl),          // 125Mhz clock delayed for rmgii rx logic
         .reset(rstLclSync),           // reset
         .locked(mmcm1LockedOut),      // Indicated ouput clock is locked/valid
         .clk_in1(rxClkIn));           // 125 MHz reference clock provided by PHY
