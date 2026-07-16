@@ -2,7 +2,7 @@
 -- Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
 -- --------------------------------------------------------------------------------
 -- Tool Version: Vivado v.2025.2 (lin64) Build 6299465 Fri Nov 14 12:34:56 MST 2025
--- Date        : Wed Jul 15 19:25:45 2026
+-- Date        : Wed Jul 15 20:48:18 2026
 -- Host        : ian-rider-B650-EAGLE-AX running 64-bit Ubuntu 24.04.4 LTS
 -- Command     : write_vhdl -force -mode funcsim
 --               /home/ian-rider/eth_book_git_wa/ethernet_to_book/ethernet_to_book_proj/project/project.gen/sources_1/ip/rx_clk_shift/rx_clk_shift_sim_netlist.vhdl

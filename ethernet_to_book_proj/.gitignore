@@ -1,4 +1,6 @@
-proj/
+project/project.cache
+project/project.runs
+project/project.sim
 vivado*
 .Xil
 xvlog*
