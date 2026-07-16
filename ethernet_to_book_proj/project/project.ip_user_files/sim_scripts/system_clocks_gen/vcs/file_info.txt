@@ -1,0 +1,7 @@
+xpm_cdc.sv,systemverilog,xpm,../../tools/xilinx/2025.2/data/ip/xpm/xpm_cdc/hdl/xpm_cdc.sv,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+xpm_fifo.sv,systemverilog,xpm,../../tools/xilinx/2025.2/data/ip/xpm/xpm_fifo/hdl/xpm_fifo.sv,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+xpm_memory.sv,systemverilog,xpm,../../tools/xilinx/2025.2/data/ip/xpm/xpm_memory/hdl/xpm_memory.sv,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+xpm_VCOMP.vhd,vhdl,xpm,../../tools/xilinx/2025.2/data/ip/xpm/xpm_VCOMP.vhd,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+system_clocks_gen_clk_wiz.v,verilog,xil_defaultlib,../../../../project.gen/sources_1/ip/system_clocks_gen/system_clocks_gen_clk_wiz.v,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+system_clocks_gen.v,verilog,xil_defaultlib,../../../../project.gen/sources_1/ip/system_clocks_gen/system_clocks_gen.v,incdir="../../../ipstatic"incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../ipstatic"
+glbl.v,Verilog,xil_defaultlib,glbl.v

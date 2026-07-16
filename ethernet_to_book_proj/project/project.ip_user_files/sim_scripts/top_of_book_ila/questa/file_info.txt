@@ -1,0 +1,6 @@
+xpm_cdc.sv,systemverilog,xpm,../../../../../../tools/xilinx/2025.2/data/ip/xpm/xpm_cdc/hdl/xpm_cdc.sv,incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../../project.gen/sources_1/ip/top_of_book_ila/hdl/verilog"
+xpm_memory.sv,systemverilog,xpm,../../../../../../tools/xilinx/2025.2/data/ip/xpm/xpm_memory/hdl/xpm_memory.sv,incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../../project.gen/sources_1/ip/top_of_book_ila/hdl/verilog"
+xpm_fifo.sv,systemverilog,xpm,../../../../../../tools/xilinx/2025.2/data/ip/xpm/xpm_fifo/hdl/xpm_fifo.sv,incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../../project.gen/sources_1/ip/top_of_book_ila/hdl/verilog"
+xpm_VCOMP.vhd,vhdl,xpm,../../../../../../tools/xilinx/2025.2/data/ip/xpm/xpm_VCOMP.vhd,incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../../project.gen/sources_1/ip/top_of_book_ila/hdl/verilog"
+top_of_book_ila.v,verilog,xil_defaultlib,../../../../project.gen/sources_1/ip/top_of_book_ila/sim/top_of_book_ila.v,incdir="../../../../../../../../tools/xilinx/2025.2/data/rsb/busdef"incdir="../../../../project.gen/sources_1/ip/top_of_book_ila/hdl/verilog"
+glbl.v,Verilog,xil_defaultlib,glbl.v

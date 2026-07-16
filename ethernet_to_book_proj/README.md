@@ -34,7 +34,7 @@ A low-latency FPGA implementation of 1G networking stack for processing UDP pack
     - The order map is of variable depth with 2K depth being targeted for timing closure.
     - A hash table is implemented where the received ITCH reference number is passed through a hash function to index into BRAM. The RAM is initialized to zeros which is how the insertion detects if an address has been written to. Upon order deletion, the location will be zeroed out freeing it for future use.
     - One 64bit X 2K BRAM is used for reference number storage while a second 65 bit X 2K BRAM is used for price, quantity, and side data of correlating reference number.
-5. **Order Book** (buy side done, sell side in progress)
+5. **Order Book**
     - Add order message type implemented with tick to top of book update in 845ns.
     - Single instrument supported with variable depth.
     - All price levels are updated in 3 clock upon receiving a new order no matter the book depth. Add orders make it to the book level faster as delete/execute messages must be looked up in BRAM first, but both types only require 3 clocks once they are received.
